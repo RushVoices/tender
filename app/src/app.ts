@@ -64,13 +64,17 @@ let editing: IssuerState | null = null;
 // ---------------------------------------------------------------- ui helpers
 
 let toastTimer = 0;
+const hideToast = () => ($("#toast").className = "toast");
 function toast(html: string, err = false) {
   const el = $("#toast");
   el.innerHTML = html;
   el.className = "toast show" + (err ? " err" : "");
   clearTimeout(toastTimer);
-  toastTimer = window.setTimeout(() => (el.className = "toast"), err ? 6000 : 4500);
+  // Long enough to reach the transaction link; hovering keeps it open.
+  toastTimer = window.setTimeout(hideToast, 10_000);
 }
+$("#toast").addEventListener("mouseenter", () => clearTimeout(toastTimer));
+$("#toast").addEventListener("mouseleave", () => { toastTimer = window.setTimeout(hideToast, 3_000); });
 
 async function run(btn: HTMLButtonElement, label: string, fn: () => Promise<string>) {
   const was = btn.textContent;
