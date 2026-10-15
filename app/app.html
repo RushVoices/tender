@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tender · App</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@600;700;800;900&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23ffd60a' stroke='%23111' stroke-width='3'/%3E%3Ctext x='16' y='21.5' font-size='15' font-family='Arial' font-weight='900' text-anchor='middle' fill='%23111'%3Et%3C/text%3E%3C/svg%3E" />
+  <style>
+    .wrap { padding: 8px clamp(16px, 5vw, 64px) 80px; max-width: 1240px; margin: 0 auto; }
+    .stats { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); border: 1.5px solid var(--ink); border-radius: 18px; background: var(--paper); overflow: hidden; margin: 18px 0 28px; }
+    .stats > div { padding: 14px 18px; border-right: 1px solid var(--line); }
+    .stats > div:last-child { border-right: 0; }
+    .stats b { display: block; font: 800 24px/1.2 var(--display); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+    .notice { border: 1.5px dashed var(--yellow-deep); background: var(--yellow-wash); border-radius: 14px; padding: 14px 18px; margin: 18px 0; display: none; }
+    .notice.show { display: block; }
+    .tabs { display: inline-flex; gap: 2px; padding: 5px; border: 1px solid var(--line-2); border-radius: 999px; background: var(--paper); margin-bottom: 20px; }
+    .tabs a { text-decoration: none; padding: 9px 18px; border-radius: 999px; font-weight: 600; font-size: 15px; color: var(--ink-2); }
+    .tabs a.on { background: var(--ink); color: #fff; }
+    .pane { display: none; }
+    .pane.on { display: block; }
+    .grid2 { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr); gap: 22px; align-items: start; }
+    h1.title { font: 900 clamp(40px, 5vw, 64px)/0.95 var(--display); letter-spacing: -0.055em; margin: 10px 0 0; }
+    .route { display: grid; grid-template-columns: minmax(0, 1fr) 84px 140px 36px; gap: 8px; margin-bottom: 8px; }
+    .route .x { border: 1.5px solid var(--line-2); border-radius: 10px; background: var(--paper); cursor: pointer; }
+    .route .x:hover { border-color: var(--red); color: var(--red); }
+    .coin2d {
+      width: 220px; height: 220px; border-radius: 50%; margin: 6px auto 18px; display: grid; place-items: center; text-align: center;
+      background: radial-gradient(circle at 35% 30%, #fff3a6, var(--yellow) 45%, var(--yellow-deep));
+      box-shadow: inset 0 0 0 7px var(--ink), inset 0 0 0 16px var(--yellow), inset 0 0 0 18px rgba(17,17,16,.5), 10px 14px 0 -2px rgba(17,17,16,.12);
+      transform: perspective(600px) rotateY(-14deg) rotateX(6deg);
+    }
+    .coin2d b { font: 900 34px/1 var(--display); letter-spacing: -0.05em; display: block; max-width: 170px; overflow-wrap: anywhere; }
+    .seg { display: inline-flex; border: 1.5px solid var(--ink); border-radius: 999px; overflow: hidden; margin-bottom: 16px; }
+    .seg button { border: 0; background: transparent; padding: 9px 22px; font-weight: 600; cursor: pointer; }
+    .seg button.on { background: var(--yellow); }
+    .bal { display: flex; justify-content: space-between; margin: -6px 0 14px; }
+    .bal a { cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 14px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { font: 500 12px var(--mono); color: var(--muted); text-transform: lowercase; }
+    td.num { font-variant-numeric: tabular-nums; font-family: var(--mono); font-size: 14px; }
+    .sym { font: 800 20px/1 var(--display); letter-spacing: -0.03em; }
+    .routes-mini { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+    .empty { padding: 40px; text-align: center; color: var(--muted); }
+    .wallet-pill { font-family: var(--mono); font-size: 13px; }
+    @media (max-width: 960px) {
+      .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .stats > div:nth-child(3) { border-right: 0; }
+      .stats > div:nth-child(-n+3) { border-bottom: 1px solid var(--line); }
+      .grid2 { grid-template-columns: 1fr; }
+      .table-wrap { overflow-x: auto; }
+    }
+    @media (max-width: 560px) {
+      .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .stats > div { border-right: 1px solid var(--line) !important; border-bottom: 1px solid var(--line); }
+      .stats > div:nth-child(2n) { border-right: 0 !important; }
+      .route { grid-template-columns: 1fr 72px; }
+      .route select { grid-column: 1; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <a class="brand" href="./"><span class="brand-mark">t</span>tender</a>
+    <div class="nav-links">
+      <a href="#issue" data-tab="issue">Issue</a>
+      <a href="#convert" data-tab="convert">Mint &amp; redeem</a>
+      <a href="#dollars" data-tab="dollars">Dollars</a>
+      <a href="docs.html">Docs</a>
+    </div>
+    <div class="nav-right">
+      <button class="btn small" id="connect">Connect wallet</button>
+    </div>
+  </nav>
+
+  <main class="wrap">
+    <div class="notice" id="notice"></div>
+
+    <div class="stats">
+      <div><span class="mono muted">supply</span><b id="st-supply">–</b></div>
+      <div><span class="mono muted">reserve value</span><b id="st-value">–</b></div>
+      <div><span class="mono muted">liquid usdc</span><b id="st-usdc">–</b></div>
+      <div><span class="mono muted">treasuries</span><b id="st-tbill">–</b></div>
+      <div><span class="mono muted">yield counted</span><b id="st-yield">–</b></div>
+      <div><span class="mono muted">dollars</span><b id="st-count">–</b></div>
+    </div>
+
+    <div class="tabs" role="tablist">
+      <a href="#issue" data-tab="issue">Issue</a>
+      <a href="#convert" data-tab="convert">Mint &amp; redeem</a>
+      <a href="#dollars" data-tab="dollars">Dollars</a>
+    </div>
+
+    <!-- issue -->
+    <section class="pane" id="pane-issue">
+      <div class="grid2">
+        <form class="card" id="issue-form" autocomplete="off">
+          <h1 class="title" id="issue-title">Issue a dollar.</h1>
+          <p class="muted" id="issue-sub" style="margin:10px 0 22px">One transaction creates the mint, its on-chain name and symbol, and your yield routes.</p>
+          <label class="field"><span>name</span><input class="input" id="f-name" maxlength="32" placeholder="Bonk Dollar" required /></label>
+          <label class="field"><span>symbol &middot; 2–10 letters or digits, unique</span><input class="input big" id="f-symbol" maxlength="10" placeholder="BONKUSD" required /></label>
+          <label class="field"><span>metadata uri &middot; optional json with an image</span><input class="input" id="f-uri" maxlength="200" placeholder="https://…/dollar.json" /></label>
+          <div class="field" style="margin-top:8px">
+            <span>yield routes &middot; up to 4, must add up to 100%</span>
+            <div id="routes"></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
+              <button type="button" class="btn small ghost" id="add-route">+ Add route</button>
+              <span class="mono" id="route-total">100%</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:20px;flex-wrap:wrap">
+            <button class="btn" id="issue-submit" type="submit">Issue dollar</button>
+            <button class="btn ghost" id="issue-cancel" type="button" style="display:none">Cancel</button>
+          </div>
+        </form>
+        <div class="card" style="text-align:center">
+          <div class="coin2d"><div><span class="mono">$1</span><b id="coin-sym">YOURUSD</b><span class="mono" style="font-size:11px">TENDER</span></div></div>
+          <div class="rows" style="text-align:left">
+            <div class="row">mint &amp; redeem <b>1 : 1 USDC</b></div>
+            <div class="row">mint authority <b>program only</b></div>
+            <div class="row">freeze authority <b>none</b></div>
+            <div class="row">token standard <b>Token-2022</b></div>
+            <div class="row">yield to you <b id="fee-note">–</b></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- convert -->
+    <section class="pane" id="pane-convert">
+      <div class="grid2">
+        <form class="card" id="convert-form" autocomplete="off">
+          <h1 class="title">Mint &amp; redeem.</h1>
+          <p class="muted" style="margin:10px 0 22px">Always one USDC for one dollar, both ways. No fee.</p>
+          <div class="seg"><button type="button" data-mode="mint" class="on">Mint</button><button type="button" data-mode="redeem">Redeem</button></div>
+          <label class="field"><span>dollar</span><select class="input" id="c-issuer"></select></label>
+          <label class="field"><span id="c-label">you pay (USDC)</span><input class="input big" id="c-amount" inputmode="decimal" placeholder="0.00" /></label>
+          <div class="bal mono muted"><span id="c-bal">balance –</span><a id="c-max">max</a></div>
+          <div class="rows"><div class="row"><span id="c-get-label">you get</span><b id="c-get">0.00</b></div></div>
+          <button class="btn" style="margin-top:20px;width:100%" id="c-submit" type="submit">Mint</button>
+          <p class="mono muted" id="devnet-help" hidden style="margin:14px 0 0;line-height:1.6">Testing on devnet? Get free test USDC at <a href="https://faucet.circle.com" target="_blank" rel="noopener">faucet.circle.com</a> (pick Solana Devnet) and test SOL for fees at <a href="https://faucet.solana.com" target="_blank" rel="noopener">faucet.solana.com</a>.</p>
+        </form>
+        <div class="card">
+          <div class="mono muted">your balances</div>
+          <div class="rows" style="margin-top:12px" id="my-bals"><div class="row">connect a wallet <b>–</b></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- dollars -->
+    <section class="pane" id="pane-dollars">
+      <div class="card table-wrap" style="padding:8px 12px">
+        <table>
+          <thead><tr><th>dollar</th><th>supply</th><th>ready to harvest</th><th>paid out</th><th>routes</th><th></th></tr></thead>
+          <tbody id="dollar-rows"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+        </table>
+      </div>
+      <p class="mono muted" style="margin-top:14px">Harvest is permissionless. Anyone can press it, and it can only pay the dollar’s own routes.</p>
+    </section>
+  </main>
+
+  <div class="toast" id="toast"></div>
+  <script type="module" src="/src/app.ts"></script>
+</body>
+</html>

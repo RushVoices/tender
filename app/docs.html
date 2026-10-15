@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tender · Docs</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@600;700;800;900&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23ffd60a' stroke='%23111' stroke-width='3'/%3E%3Ctext x='16' y='21.5' font-size='15' font-family='Arial' font-weight='900' text-anchor='middle' fill='%23111'%3Et%3C/text%3E%3C/svg%3E" />
+  <style>
+    .docs { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: clamp(24px, 4vw, 64px); padding: 20px clamp(16px, 5vw, 64px) 100px; max-width: 1240px; margin: 0 auto; }
+    .side { position: sticky; top: 84px; align-self: start; max-height: calc(100vh - 100px); overflow: auto; padding-bottom: 20px; }
+    .side h4 { font: 700 15px var(--body); margin: 26px 0 10px; }
+    .side h4:first-child { margin-top: 8px; }
+    .side ul { list-style: none; margin: 0; padding: 0; border-left: 1px solid var(--line-2); }
+    .side a { display: block; text-decoration: none; padding: 6px 0 6px 16px; color: var(--muted); font-size: 15px; margin-left: -1px; border-left: 2px solid transparent; }
+    .side a:hover { color: var(--ink); }
+    .side a.on { color: var(--ink); font-weight: 600; border-left-color: var(--yellow-deep); }
+    .prose { max-width: 740px; font-size: 16.5px; line-height: 1.7; color: var(--ink-2); }
+    .prose section { padding-top: 18px; margin-bottom: 54px; scroll-margin-top: 80px; }
+    .prose h1 { font: 900 clamp(44px, 5vw, 72px)/0.95 var(--display); letter-spacing: -0.055em; color: var(--ink); margin: 18px 0 18px; }
+    .prose h2 { font: 800 32px/1.1 var(--display); letter-spacing: -0.04em; color: var(--ink); margin: 0 0 14px; }
+    .prose h3 { font: 700 19px/1.3 var(--display); letter-spacing: -0.02em; color: var(--ink); margin: 28px 0 8px; }
+    .prose p { margin: 0 0 14px; }
+    .prose ul, .prose ol { padding-left: 22px; margin: 0 0 14px; }
+    .prose li { margin-bottom: 6px; }
+    .prose strong { color: var(--ink); }
+    .prose pre { background: var(--ink); color: #f5f1e1; border-radius: 14px; padding: 16px 18px; overflow-x: auto; font: 13.5px/1.6 var(--mono); margin: 0 0 16px; }
+    .prose pre code { background: none; border: 0; padding: 0; color: inherit; font-size: inherit; }
+    .prose table { width: 100%; border-collapse: collapse; margin: 0 0 16px; font-size: 14.5px; }
+    .prose th, .prose td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    .prose th { font: 500 12px var(--mono); color: var(--muted); }
+    .prose td code { white-space: nowrap; }
+    .callout { border-left: 3px solid var(--yellow-deep); background: var(--yellow-wash); padding: 12px 16px; border-radius: 0 12px 12px 0; margin: 0 0 16px; }
+    .eq { font-family: var(--mono); font-size: 14px; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin: 0 0 16px; color: var(--ink); }
+    .next { display: flex; justify-content: flex-end; }
+    .menu-btn { display: none; }
+    @media (max-width: 860px) {
+      .docs { grid-template-columns: 1fr; }
+      .side { position: static; max-height: none; display: none; }
+      .side.open { display: block; }
+      .menu-btn { display: inline-flex; }
+      .prose table { display: block; overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <a class="brand" href="./"><span class="brand-mark">t</span>tender <span class="mono muted" style="font-size:12px;margin-left:4px">docs</span></a>
+    <div class="nav-links">
+      <a href="app.html#issue">Issue</a>
+      <a href="app.html#convert">Mint &amp; redeem</a>
+      <a href="app.html#dollars">Dollars</a>
+      <a href="docs.html" class="active">Docs</a>
+    </div>
+    <div class="nav-right">
+      <button class="btn small ghost menu-btn" id="menu">Contents</button>
+      <a class="btn small" href="app.html">Launch app</a>
+    </div>
+  </nav>
+
+  <div class="docs">
+    <aside class="side" id="side">
+      <h4>Getting started</h4>
+      <ul>
+        <li><a href="#what-tender-is">What Tender is</a></li>
+        <li><a href="#quickstart">Quickstart</a></li>
+        <li><a href="#wallets">Wallets and signing in</a></li>
+      </ul>
+      <h4>Concepts</h4>
+      <ul>
+        <li><a href="#how-tender-works">How Tender works</a></li>
+        <li><a href="#the-reserve">The reserve</a></li>
+        <li><a href="#yield-routes">Yield routes</a></li>
+        <li><a href="#conversion-at-par">Conversion at par</a></li>
+        <li><a href="#how-yield-is-counted">How yield is counted</a></li>
+        <li><a href="#tender-token">The $TENDER token</a></li>
+      </ul>
+      <h4>Reference</h4>
+      <ul>
+        <li><a href="#instructions">Instructions</a></li>
+        <li><a href="#accounts">Accounts and addresses</a></li>
+        <li><a href="#errors">Errors</a></li>
+        <li><a href="#client">TypeScript client</a></li>
+      </ul>
+      <h4>Trust</h4>
+      <ul>
+        <li><a href="#roles">Roles and limits</a></li>
+        <li><a href="#risks">Risks</a></li>
+      </ul>
+    </aside>
+
+    <main class="prose">
+      <section id="what-tender-is">
+        <div class="mono muted">Getting started</div>
+        <h1>What Tender is</h1>
+        <p>Tender lets a community issue its own dollar on Solana. A memecoin, an app, a DAO or a creator names it, and anyone can then mint it one for one with USDC and redeem it the same way.</p>
+        <p>Every Tender dollar stands on one shared reserve of USDC and tokenized Treasuries. What that reserve earns goes where each issuer routes it.</p>
+        <div class="callout"><strong>In one line:</strong> a stablecoin under your name, with the float’s yield paid to you instead of to a stablecoin company.</div>
+        <h3>What you get as an issuer</h3>
+        <ul>
+          <li>A <strong>Token-2022 mint</strong> with your name and symbol stored on-chain, so wallets and explorers show it correctly.</li>
+          <li><strong>1:1 mint and redeem</strong> against USDC, for anyone, with no fee.</li>
+          <li><strong>Yield</strong> on every dollar of yours that’s outstanding, paid to up to four routes you choose.</li>
+          <li>No reserve to run. The program holds the USDC and Treasuries for every issuer together.</li>
+        </ul>
+        <h3>What holders get</h3>
+        <p>A dollar that is always worth one USDC at the program: put one in, get one out. The program is the only mint authority, the mint has no freeze authority, and redemptions can’t be paused.</p>
+      </section>
+
+      <section id="quickstart">
+        <h2>Quickstart</h2>
+        <h3>Issue a dollar (in the app)</h3>
+        <ol>
+          <li>Open the <a href="app.html#issue">app</a> and connect a wallet.</li>
+          <li>Enter a name (“Bonk Dollar”) and a symbol (<code>BONKUSD</code>). Symbols are 2–10 characters, A–Z and 0–9, and first come first served.</li>
+          <li>Set routes. By default all yield goes to your wallet as USDC. Add up to four, and they must add up to 100%.</li>
+          <li>Press <strong>Issue dollar</strong> and approve one transaction. It creates the issuer account, the mint and its metadata.</li>
+        </ol>
+        <p>Then share the mint page: anyone can <a href="app.html#convert">mint</a> your dollar from there.</p>
+        <h3>Run it yourself</h3>
+        <p>The repo has the program (<code>programs/tender</code>, Rust and Anchor) and the site (<code>app/</code>, Vite and TypeScript). You need Rust, the Solana CLI 2.2 and Node 20+.</p>
+<pre><code># build and test the program (14 end-to-end tests in LiteSVM)
+cargo build-sbf --manifest-path programs/tender/Cargo.toml
+cargo test -p tender --test integration
+
+# deploy to devnet
+solana program deploy target/deploy/tender.so --program-id keys/tender-program-keypair.json
+
+# create the reserve (makes test USDC and Treasury mints on devnet)
+cd app &amp;&amp; npm install
+RPC_URL=https://api.devnet.solana.com npx tsx scripts/init-reserve.ts
+
+# run the site
+cp .env.example .env &amp;&amp; npm run dev</code></pre>
+        <p>To check the site’s client against the real program, start a local validator with the program loaded and run the end-to-end script:</p>
+<pre><code>solana-test-validator --reset \
+  --bpf-program Tnd4ZV5367L8r7DDxLH97bA64SkR4Ke1Lf6GZa9VwgJ ../target/deploy/tender.so
+npm run e2e</code></pre>
+      </section>
+
+      <section id="wallets">
+        <h2>Wallets and signing in</h2>
+        <p>There are no accounts and no sign-up. Connecting a wallet only tells the site your address so it can show balances and build transactions. Phantom, Solflare and Backpack work out of the box.</p>
+        <p>Every action is one transaction you approve in your wallet. The site never holds keys. Minting or redeeming also creates your token account for that dollar if you don’t have one yet, which costs a little SOL in rent the first time.</p>
+        <p>Harvesting is open to anyone. A wallet that harvests pays the transaction fee, and the yield still goes only to the dollar’s routes.</p>
+      </section>
+
+      <section id="how-tender-works">
+        <div class="mono muted">Concepts</div>
+        <h2>How Tender works</h2>
+        <p>There are three kinds of account:</p>
+        <ul>
+          <li><strong>The reserve</strong> (one). It holds two vaults: liquid USDC and a tokenized Treasury. It tracks how many Tender dollars exist across every issuer, and how much yield has been counted.</li>
+          <li><strong>Issuers</strong> (one per dollar). Each has a name, a symbol, a mint, a supply and up to four routes.</li>
+          <li><strong>Mints</strong> (one per issuer). These are Token-2022 mints whose mint authority is the issuer account, which only the program can sign for.</li>
+        </ul>
+        <p>Money moves through four paths:</p>
+        <table>
+          <tr><th>action</th><th>who</th><th>what moves</th></tr>
+          <tr><td>mint</td><td>anyone</td><td>USDC in, the same amount of the dollar out</td></tr>
+          <tr><td>redeem</td><td>any holder</td><td>the dollar burned, the same amount of USDC out</td></tr>
+          <tr><td>invest / divest</td><td>allocator</td><td>USDC swapped for Treasury tokens (or back) at the reserve’s price</td></tr>
+          <tr><td>harvest</td><td>anyone</td><td>an issuer’s earned yield, paid to its routes</td></tr>
+        </table>
+      </section>
+
+      <section id="the-reserve">
+        <h2>The reserve</h2>
+        <p>All dollars share one reserve. It holds:</p>
+        <ul>
+          <li><strong>Liquid USDC.</strong> Redemptions are paid from this.</li>
+          <li><strong>A tokenized Treasury</strong>, such as a T-bill token. It earns interest and is valued at the reserve’s price.</li>
+        </ul>
+        <div class="eq">value = usdc_vault + tbill_vault × tbill_price<br>owed &nbsp;= total_supply + unclaimed_yield</div>
+        <p>If the reserve is worth more than it owes, the difference is yield. If it’s worth less (say the Treasury price dipped), no yield is counted until the shortfall is made up. Dollars stay redeemable at par as long as there’s liquid USDC.</p>
+        <h3>The liquidity floor</h3>
+        <p>The allocator moves USDC into Treasuries to earn yield, and back out to meet redemptions. The program refuses any <code>invest</code> that would leave less liquid USDC than <code>min_liquid_bps</code> of total supply (20% by default). If redemptions drain the USDC, the allocator <code>divest</code>s Treasuries back into USDC.</p>
+        <h3>Why one shared reserve</h3>
+        <p>A small community can’t buy Treasuries on its own, and a thin reserve couldn’t handle a run of redemptions. Pooled, every issuer gets the same yield per dollar, and every redemption draws on the whole pile.</p>
+      </section>
+
+      <section id="yield-routes">
+        <h2>Yield routes</h2>
+        <p>Each issuer has one to four routes. A route is a wallet, a share in basis points, and a kind. The shares must add up to 10,000 (100%).</p>
+        <table>
+          <tr><th>kind</th><th>pays</th><th>good for</th></tr>
+          <tr><td><code>0</code> USDC</td><td>USDC from the reserve to the wallet</td><td>a team, dev or DAO treasury</td></tr>
+          <tr><td><code>1</code> dollar</td><td>newly minted units of your dollar to the wallet</td><td>rewards, airdrops or a buyback wallet</td></tr>
+        </table>
+        <p>A dollar route doesn’t dilute anyone. The new dollars are backed by the yield itself, which is already sitting in the reserve.</p>
+        <p>Only the issuer’s authority (the wallet that created it, unless handed over with <code>set_issuer_authority</code>) can change routes. Yield already earned is paid under whatever routes are set when it’s harvested.</p>
+      </section>
+
+      <section id="conversion-at-par">
+        <h2>Conversion at par</h2>
+        <p><code>mint</code> takes <em>n</em> USDC and mints <em>n</em> of the dollar. <code>redeem</code> burns <em>n</em> and pays <em>n</em> USDC. Both use 6 decimals, like USDC, so the amounts are identical down to the smallest unit.</p>
+        <ul>
+          <li><strong>No fee and no spread.</strong> The protocol earns only from yield.</li>
+          <li><strong>No oracle on the way in or out.</strong> The Treasury price affects only how much yield is counted.</li>
+          <li><strong>Redemptions are never paused.</strong> The admin can pause new mints. The only thing that can stop a redemption is the reserve not having enough liquid USDC at that moment, which the floor and the allocator exist to prevent.</li>
+          <li><strong>A dollar redeems only through its own issuer.</strong> BONKUSD burns against the BONKUSD issuer, but the USDC comes from the shared vault.</li>
+        </ul>
+      </section>
+
+      <section id="how-yield-is-counted">
+        <h2>How yield is counted</h2>
+        <p>Every instruction that touches the reserve first runs <code>accrue</code>:</p>
+        <div class="eq">surplus = value − owed<br>fee &nbsp;&nbsp;&nbsp;&nbsp;= surplus × protocol_fee_bps / 10,000<br>yield_index += (surplus − fee) × 10¹⁸ / total_supply<br>unclaimed_yield += surplus</div>
+        <p><code>yield_index</code> is a running total of yield per dollar outstanding. Each issuer stores the index it last saw. When its supply is about to change, it settles:</p>
+        <div class="eq">accrued += supply × (yield_index − index_snapshot) / 10¹⁸</div>
+        <p>So an issuer earns in proportion to how many dollars it had outstanding, and for how long. A dollar minted after yield came in doesn’t share in that yield, because the mint settles everyone before the new supply is added.</p>
+        <h3>Worked example</h3>
+        <p>AUSD has 1,000 outstanding and BUSD has 3,000. The reserve holds 2,000 USDC and 2,000 Treasury tokens at $1.00. The Treasury price goes to $1.005, so the reserve is worth 10 USDC more than it owes. With a 10% protocol fee, 9 goes to issuers: 2.25 to AUSD and 6.75 to BUSD. If AUSD routes 60% as USDC and 40% as AUSD, a harvest sends 1.35 USDC to the first wallet and mints 0.90 AUSD to the second. This exact case is one of the program’s tests.</p>
+        <h3>Rounding</h3>
+        <p>Every division rounds in the reserve’s favour. Issuers together can never be paid more than was counted, and the tests check after every step that the reserve covers every dollar plus every unpaid bit of yield.</p>
+      </section>
+
+      <section id="tender-token">
+        <h2>The $TENDER token</h2>
+        <div class="callout">$TENDER isn’t part of the program in this repo, and nothing here mints or sells it.</div>
+        <p>The program sends its protocol fee, a share of yield capped at 20% by code, to a <code>treasury</code> wallet that the admin sets. The plan is for that fee, and control of the reserve’s settings (fee, liquidity floor, allocator, price authority), to pass to $TENDER holders through governance once there is one.</p>
+        <p>Tender dollars never need $TENDER. Minting, redeeming, issuing and harvesting work without it.</p>
+      </section>
+
+      <section id="instructions">
+        <div class="mono muted">Reference</div>
+        <h2>Instructions</h2>
+        <table>
+          <tr><th>instruction</th><th>signer</th><th>does</th></tr>
+          <tr><td><code>initialize_reserve</code></td><td>admin</td><td>Creates the reserve and its two vaults, once.</td></tr>
+          <tr><td><code>update_reserve</code></td><td>admin</td><td>Sets roles, fee (≤ 20%), liquidity floor and mint pause. Counts yield under the old fee first.</td></tr>
+          <tr><td><code>set_admin</code></td><td>admin</td><td>Hands over admin.</td></tr>
+          <tr><td><code>create_issuer</code></td><td>creator</td><td>Creates the issuer, the Token-2022 mint (metadata pointer plus on-chain metadata) and the routes.</td></tr>
+          <tr><td><code>set_routes</code></td><td>issuer authority</td><td>Replaces the routes.</td></tr>
+          <tr><td><code>set_issuer_authority</code></td><td>issuer authority</td><td>Hands over the issuer.</td></tr>
+          <tr><td><code>mint</code></td><td>user</td><td>USDC in, dollar out, 1:1.</td></tr>
+          <tr><td><code>redeem</code></td><td>user</td><td>Dollar burned, USDC out, 1:1.</td></tr>
+          <tr><td><code>harvest</code></td><td>anyone</td><td>Pays an issuer’s earned yield to its routes. Remaining accounts: one token account per route, in order.</td></tr>
+          <tr><td><code>collect_protocol_fee</code></td><td>anyone</td><td>Pays the protocol’s share of yield to the treasury’s USDC account.</td></tr>
+          <tr><td><code>update_price</code></td><td>price authority</td><td>Moves the Treasury price by ≤ 0.5%, at most once an hour.</td></tr>
+          <tr><td><code>invest</code> / <code>divest</code></td><td>allocator</td><td>Swaps USDC and Treasuries at the reserve price. <code>invest</code> must respect the liquidity floor.</td></tr>
+        </table>
+      </section>
+
+      <section id="accounts">
+        <h2>Accounts and addresses</h2>
+        <table>
+          <tr><th>account</th><th>seeds</th></tr>
+          <tr><td>program</td><td><code>Tnd4ZV5367L8r7DDxLH97bA64SkR4Ke1Lf6GZa9VwgJ</code></td></tr>
+          <tr><td>reserve</td><td><code>["reserve"]</code></td></tr>
+          <tr><td>USDC vault</td><td><code>["usdc_vault"]</code></td></tr>
+          <tr><td>Treasury vault</td><td><code>["tbill_vault"]</code></td></tr>
+          <tr><td>issuer</td><td><code>["issuer", symbol]</code></td></tr>
+          <tr><td>dollar mint</td><td><code>["mint", issuer]</code></td></tr>
+        </table>
+        <h3>Units</h3>
+        <ul>
+          <li>Amounts are base units with 6 decimals (1 USDC = 1,000,000).</li>
+          <li><code>tbill_price</code> is USDC base units per Treasury base unit, × 10⁹. So 1_005_000_000 means $1.005.</li>
+          <li><code>yield_index</code> is yield per dollar base unit, × 10¹⁸.</li>
+        </ul>
+      </section>
+
+      <section id="errors">
+        <h2>Errors</h2>
+        <table>
+          <tr><th>code</th><th>name</th><th>meaning</th></tr>
+          <tr><td>6000</td><td>BadSymbol</td><td>Symbol must be 2–10 characters, A–Z and 0–9 only</td></tr>
+          <tr><td>6001</td><td>BadName</td><td>Name must be 1–32 characters</td></tr>
+          <tr><td>6002</td><td>BadUri</td><td>Metadata URI is over 200 characters</td></tr>
+          <tr><td>6003</td><td>BadRoutes</td><td>Routes must be 1–4 wallets whose shares add up to 100%</td></tr>
+          <tr><td>6004</td><td>BadRouteAccounts</td><td>Route token accounts missing or not matching the routes</td></tr>
+          <tr><td>6005</td><td>ZeroAmount</td><td>Amount must be greater than zero</td></tr>
+          <tr><td>6006</td><td>Paused</td><td>Minting is paused</td></tr>
+          <tr><td>6007</td><td>InsufficientLiquidity</td><td>Not enough liquid USDC right now</td></tr>
+          <tr><td>6008</td><td>BelowLiquidityFloor</td><td>Invest would breach the liquidity floor</td></tr>
+          <tr><td>6009</td><td>NothingToHarvest</td><td>No yield to pay out yet</td></tr>
+          <tr><td>6010</td><td>BadPrice</td><td>Price must be positive and move ≤ 0.5%</td></tr>
+          <tr><td>6011</td><td>PriceTooSoon</td><td>Price updated less than an hour ago</td></tr>
+          <tr><td>6012</td><td>FeeTooHigh</td><td>Protocol fee above the 20% cap</td></tr>
+          <tr><td>6013</td><td>BadParams</td><td>Invalid reserve parameters</td></tr>
+          <tr><td>6014</td><td>Overflow</td><td>Arithmetic overflow</td></tr>
+        </table>
+      </section>
+
+      <section id="client">
+        <h2>TypeScript client</h2>
+        <p><code>app/src/chain/tender.ts</code> has no Anchor dependency. It builds every instruction, decodes both account types and mirrors the yield math, so a UI can show what a harvest will pay before anyone sends one.</p>
+<pre><code>import { Connection } from "@solana/web3.js";
+import { Tender, parseUsd, harvestable } from "./chain/tender";
+
+const t = new Tender(new Connection(RPC));
+const reserve = await t.fetchReserve();
+
+// mint 100 BONKUSD (creates the user's token accounts if needed)
+const ixs = t.convert("mint", user, reserve.usdcMint, "BONKUSD", parseUsd("100"));
+
+// what would a harvest pay right now?
+const issuer = await t.fetchIssuer("BONKUSD");
+const { usdc, tbill } = await t.vaultBalances();
+const ready = harvestable(reserve, issuer, usdc, tbill);</code></pre>
+      </section>
+
+      <section id="roles">
+        <div class="mono muted">Trust</div>
+        <h2>Roles and limits</h2>
+        <table>
+          <tr><th>role</th><th>can</th><th>can’t</th></tr>
+          <tr><td>admin</td><td>set roles, fee, floor; pause mints</td><td>take USDC, pause redemptions, mint dollars, set a fee above 20%</td></tr>
+          <tr><td>price authority</td><td>move the Treasury price ±0.5% an hour</td><td>move it faster, or touch any funds</td></tr>
+          <tr><td>allocator</td><td>swap USDC ↔ Treasuries at the reserve price</td><td>take value out, or go below the liquidity floor</td></tr>
+          <tr><td>issuer authority</td><td>change its own routes</td><td>mint its dollar without USDC, or touch the reserve</td></tr>
+        </table>
+        <p>Before mainnet, every role should sit behind a multisig (for example Squads), and so should the program’s upgrade authority.</p>
+      </section>
+
+      <section id="risks">
+        <h2>Risks</h2>
+        <div class="callout"><strong>Unaudited.</strong> The program has 14 end-to-end tests, and the site’s client passes a full run on a local validator. It has not been audited. Use devnet until it is.</div>
+        <ul>
+          <li><strong>Treasury token risk.</strong> If the tokenized Treasury loses value or freezes, the reserve can be worth less than it owes. Yield stops first. Beyond that, the last redeemers bear the loss.</li>
+          <li><strong>Price authority.</strong> The Treasury price comes from a trusted signer, bounded to 0.5% an hour. An overstated price counts yield that isn’t there. Plug in an oracle or a NAV feed before mainnet.</li>
+          <li><strong>Allocator.</strong> It trades at the reserve’s price. If that price is stale it could trade against the reserve, up to the 0.5%-an-hour band.</li>
+          <li><strong>Liquidity.</strong> Redemptions need liquid USDC. A run larger than the floor waits on the allocator to divest.</li>
+          <li><strong>USDC.</strong> Every dollar is ultimately a claim on USDC, with all of USDC’s own risks.</li>
+          <li><strong>Regulation.</strong> Issuing dollar-like tokens and passing on Treasury yield may be regulated where you or your users are. Get legal advice.</li>
+        </ul>
+        <div class="next"><a class="btn" href="app.html#issue">Issue a dollar &rarr;</a></div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="/src/docs.ts"></script>
+</body>
+</html>

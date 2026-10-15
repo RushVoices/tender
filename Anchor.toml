@@ -1,0 +1,19 @@
+[toolchain]
+anchor_version = "0.31.1"
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+tender = "Tnd4ZV5367L8r7DDxLH97bA64SkR4Ke1Lf6GZa9VwgJ"
+
+[programs.devnet]
+tender = "Tnd4ZV5367L8r7DDxLH97bA64SkR4Ke1Lf6GZa9VwgJ"
+
+[provider]
+cluster = "devnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "cargo test -p tender --test integration"

@@ -1,0 +1,29 @@
+[package]
+name = "tender"
+version = "0.1.0"
+description = "Community dollars on one shared USDC + Treasury reserve"
+edition = "2021"
+rust-version = "1.84"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "tender"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+
+[dependencies]
+anchor-lang = "0.31.1"
+anchor-spl = { version = "0.31.1", default-features = false, features = ["token", "token_2022", "token_2022_extensions"] }
+
+[dev-dependencies]
+litesvm = "0.6.1"
+solana-sdk = "2.2"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("anchor-debug", "custom-heap", "custom-panic"))', 'cfg(target_os, values("solana"))'] }

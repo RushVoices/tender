@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tender · Your community's own dollar</title>
+  <meta name="description" content="Tender lets a community issue its own dollar on Solana, minted and redeemed 1:1 with USDC, on one shared reserve of USDC and tokenized Treasuries whose yield goes where you route it." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@600;700;800;900&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23ffd60a' stroke='%23111' stroke-width='3'/%3E%3Ctext x='16' y='21.5' font-size='15' font-family='Arial' font-weight='900' text-anchor='middle' fill='%23111'%3Et%3C/text%3E%3C/svg%3E" />
+</head>
+<body>
+  <nav class="nav">
+    <a class="brand" href="./"><span class="brand-mark">t</span>tender</a>
+    <div class="nav-links">
+      <a href="app.html#issue">Issue</a>
+      <a href="app.html#convert">Mint &amp; redeem</a>
+      <a href="app.html#dollars">Dollars</a>
+      <a href="#reserve">Reserve</a>
+      <a href="docs.html">Docs</a>
+    </div>
+    <div class="nav-right">
+      <a class="btn small" href="app.html">Launch app</a>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <div>
+      <h1 class="headline">Issue your community’s <span class="hl">own</span> dollar.</h1>
+
+      <div class="namer">
+        <label class="mono muted" for="ticker"><span>Your community</span><span>Name it</span></label>
+        <input id="ticker" value="YOURUSD" maxlength="10" spellcheck="false" autocomplete="off" aria-label="Name your dollar" />
+      </div>
+
+      <p class="lede">For memecoins, apps, DAOs and creators: a dollar under your own name, minted and redeemed 1:1 with USDC, standing on one shared reserve of USDC and tokenized Treasuries whose yield goes where you route it.</p>
+
+      <div class="cta">
+        <a class="btn" id="issue-cta" href="app.html#issue">Issue <span data-sym>YOURUSD</span> &rarr;</a>
+        <a class="btn ghost" href="docs.html">Read the docs</a>
+      </div>
+      <div class="hint mono"><span class="dot"></span>Type a name. Drag the coin. Mint one into the reserve.</div>
+    </div>
+
+    <div class="stage" id="stage">
+      <span class="chip" data-chip="usdc" style="left:4%;top:70%"><i style="background:#2775ca"></i>USDC</span>
+      <span class="chip" data-chip="tbill" style="left:58%;top:80%"><i></i>Treasuries</span>
+      <span class="chip" data-chip="r0" style="left:6%;top:12%"><i style="background:#111"></i>Treasury 60%</span>
+      <span class="chip" data-chip="r1" style="left:66%;top:16%"><i style="background:#1f9d55"></i>Holders 40%</span>
+    </div>
+
+    <aside class="panel" aria-live="polite">
+      <div class="crumb mono"><span data-sym>YOURUSD</span> / USDC &middot; example dollar</div>
+      <h2><span class="dot"></span><span id="p-title">Backed 1:1</span></h2>
+      <p id="p-text">Every <span data-sym>YOURUSD</span> is a claim on one USDC in the shared reserve. Mint one, and the USDC goes in. Redeem one, and it comes back out.</p>
+      <div class="rows">
+        <div class="row">supply <b id="s-supply">0.00</b></div>
+        <div class="row">reserve value <b id="s-value">0.00</b></div>
+        <div class="row">liquid usdc <span class="bar"><span id="b-usdc" style="width:100%"></span></span><b id="s-usdc">0.00</b></div>
+        <div class="row">treasuries <span class="bar"><span id="b-tbill" style="width:0"></span></span><b id="s-tbill">0.00</b></div>
+        <div class="row">yield earned <b id="s-yield">0.000000</b></div>
+        <div class="row">routed to treasury &middot; 60% <b id="s-r0">0.00</b></div>
+        <div class="row">routed to holders &middot; 40% <b id="s-r1">0.00</b></div>
+        <div class="row">backing per dollar <b id="s-backing">1.0000</b></div>
+      </div>
+      <div class="panel-actions">
+        <button class="btn small" id="sim-mint">Mint 1,000</button>
+        <button class="btn small ghost" id="sim-redeem">Redeem 250</button>
+        <button class="btn small yellow" id="sim-harvest">Harvest</button>
+      </div>
+    </aside>
+  </header>
+
+  <section class="block" id="how">
+    <div class="kicker mono">How it works</div>
+    <h2 class="big">One reserve. Your name on the dollar.</h2>
+    <p class="sub">Tender is a Solana program. It runs the reserve, the minting and the yield math. You pick the name and where the yield goes. Nobody can change that but you.</p>
+    <div class="steps">
+      <div class="step">
+        <div class="n">01</div>
+        <h3>Name it</h3>
+        <p>Pick a ticker like <code>BONKUSD</code>. Tender creates a Token-2022 mint with your name and symbol on-chain. The program is its only mint authority, and there is no freeze key.</p>
+      </div>
+      <div class="step">
+        <div class="n">02</div>
+        <h3>Mint and redeem at par</h3>
+        <p>Anyone deposits 1 USDC and gets 1 of your dollar. Anyone burns 1 and gets 1 USDC back. No fee, no spread, no oracle in the way. Redemptions can’t be paused.</p>
+      </div>
+      <div class="step">
+        <div class="n">03</div>
+        <h3>Route the yield</h3>
+        <p>The reserve earns on tokenized Treasuries. Your share, sized by your supply, goes to up to four routes: USDC to a wallet, or freshly minted dollars to a wallet.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="reserve">
+    <div class="reserve-band">
+      <div>
+        <div class="kicker mono">The reserve</div>
+        <h2 class="big">Every dollar stands on the same pile.</h2>
+        <p class="sub">All community dollars share one reserve of liquid USDC and tokenized Treasuries. Pooling means a small community gets the same Treasury yield as a big one, and redemptions draw on the whole pile. The program won’t let the allocator move liquid USDC below a set floor.</p>
+        <a class="btn ghost" href="docs.html#the-reserve">How the reserve works &rarr;</a>
+      </div>
+      <div class="ledger">
+        <div class="mono muted">reserve composition &middot; live example</div>
+        <div class="stackbar" id="stackbar">
+          <div class="u" id="sb-u" style="flex:1">USDC</div>
+          <div class="t" id="sb-t" style="flex:0"></div>
+          <div class="y" id="sb-y" style="flex:0"></div>
+        </div>
+        <div class="legend mono">
+          <span style="--c:#fff">liquid USDC</span>
+          <span style="--c:var(--yellow)">tokenized Treasuries</span>
+          <span style="--c:var(--ink)">yield not yet harvested</span>
+        </div>
+        <div class="rows" style="margin-top:18px">
+          <div class="row">owed to holders <b id="l-owed">0.00</b></div>
+          <div class="row">held by the reserve <b id="l-held">0.00</b></div>
+          <div class="row">surplus = yield <b id="l-surplus">0.00</b></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="who">
+    <div class="kicker mono">Who it’s for</div>
+    <h2 class="big">A dollar for anyone with a crowd.</h2>
+    <p class="sub">Your community already holds stablecoins. Today that yield goes to someone else. With Tender it goes where you send it.</p>
+    <div class="who">
+      <div><div class="mono muted">Memecoins</div><div class="tick">WIFUSD</div><p>Give the community a dollar with the meme on it, and route the yield to buybacks or the dev wallet.</p></div>
+      <div><div class="mono muted">Apps</div><div class="tick">APPUSD</div><p>Hold user balances in your own dollar. The float earns for the app instead of sitting idle.</p></div>
+      <div><div class="mono muted">DAOs</div><div class="tick">DAOUSD</div><p>Pay contributors and keep a treasury in a dollar whose yield funds the DAO.</p></div>
+      <div><div class="mono muted">Creators</div><div class="tick">FANUSD</div><p>Let fans hold your dollar. Each one they hold pays you a little every day.</p></div>
+    </div>
+  </section>
+
+  <section class="block cta-band">
+    <h2 class="big">Name it. Back it. Route it.</h2>
+    <p class="sub" style="color:var(--ink)">One transaction creates the mint, the metadata and your yield routes.</p>
+    <div class="cta"><a class="btn" href="app.html#issue">Issue <span data-sym>YOURUSD</span> &rarr;</a><a class="btn ghost" style="border-color:var(--ink)" href="docs.html#quickstart">Quickstart</a></div>
+  </section>
+
+  <footer>
+    <div><a class="brand" href="./" style="font-size:18px"><span class="brand-mark" style="width:20px;height:20px;font-size:11px">t</span>tender</a></div>
+    <div style="display:flex;gap:22px;flex-wrap:wrap"><a href="docs.html">Docs</a><a href="docs.html#risks">Risks</a><a href="app.html">App</a><a href="docs.html#instructions">Program</a></div>
+    <div class="mono">Unaudited. Devnet first.</div>
+  </footer>
+
+  <script type="module" src="/src/home.ts"></script>
+</body>
+</html>
