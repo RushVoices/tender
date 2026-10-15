@@ -196,6 +196,11 @@ pub mod tender {
         require!(amount > 0, TenderError::ZeroAmount);
         let a = ctx.accounts;
         require!(!a.reserve.paused, TenderError::Paused);
+        let cap = a.reserve.max_supply;
+        require!(
+            cap == 0 || a.reserve.total_supply.saturating_add(amount) <= cap,
+            TenderError::CapReached
+        );
         a.reserve.accrue(a.usdc_vault.amount, a.tbill_vault.amount)?;
         a.issuer.settle(a.reserve.yield_index)?;
 
@@ -516,6 +521,7 @@ impl Reserve {
         self.protocol_fee_bps = p.protocol_fee_bps;
         self.min_liquid_bps = p.min_liquid_bps;
         self.paused = p.paused;
+        self.max_supply = p.max_supply;
     }
 
     /// Total the vaults are worth, in USDC base units.
@@ -642,6 +648,10 @@ pub struct Reserve {
     pub total_yield: u64,
     pub issuer_count: u64,
     pub bump: u8,
+    /// Most community dollars that may be outstanding across all issuers,
+    /// in base units; 0 means no cap. Only `mint` checks it, so yield routed
+    /// as new dollars and redemptions always go through.
+    pub max_supply: u64,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Default, InitSpace, PartialEq, Eq, Debug)]
@@ -682,6 +692,8 @@ pub struct ReserveParams {
     pub paused: bool,
     /// Only read by `initialize_reserve`.
     pub tbill_price: u64,
+    /// 0 = no cap.
+    pub max_supply: u64,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -923,4 +935,6 @@ pub enum TenderError {
     BadParams,
     #[msg("Arithmetic overflow")]
     Overflow,
+    #[msg("This would take total supply over the reserve's cap")]
+    CapReached,
 }

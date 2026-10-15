@@ -43,7 +43,7 @@ async function main() {
 
   await send([t.initializeReserve(admin.publicKey, usdcMint, tbillMint, {
     priceAuthority: admin.publicKey, allocator: allocator.publicKey, treasury: treasury.publicKey,
-    protocolFeeBps: 1000, minLiquidBps: 2000, paused: false, tbillPrice: 1_000_000_000n,
+    protocolFeeBps: 1000, minLiquidBps: 2000, paused: false, tbillPrice: 1_000_000_000n, maxSupply: 0n,
   })], admin);
   const reserve0 = (await t.fetchReserve())!;
   assert.ok(reserve0.usdcVault.equals(t.usdcVault));

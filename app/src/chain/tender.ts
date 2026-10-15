@@ -77,6 +77,8 @@ export interface ReserveParams {
   minLiquidBps: number;
   paused: boolean;
   tbillPrice: bigint;
+  /** Most dollars that may be outstanding, base units; 0 = no cap. */
+  maxSupply: bigint;
 }
 
 export interface ReserveState {
@@ -84,7 +86,7 @@ export interface ReserveState {
   usdcMint: PublicKey; tbillMint: PublicKey; usdcVault: PublicKey; tbillVault: PublicKey;
   tbillPrice: bigint; priceUpdatedAt: bigint; protocolFeeBps: number; minLiquidBps: number;
   paused: boolean; totalSupply: bigint; yieldIndex: bigint; unclaimedYield: bigint;
-  protocolOwed: bigint; totalYield: bigint; issuerCount: bigint; bump: number;
+  protocolOwed: bigint; totalYield: bigint; issuerCount: bigint; bump: number; maxSupply: bigint;
 }
 
 export interface IssuerState {
@@ -103,6 +105,8 @@ export function decodeReserve(data: Buffer): ReserveState {
     tbillPrice: r.u64(), priceUpdatedAt: r.i64(), protocolFeeBps: r.u16(), minLiquidBps: r.u16(),
     paused: r.bool(), totalSupply: r.u64(), yieldIndex: r.u128(), unclaimedYield: r.u64(),
     protocolOwed: r.u64(), totalYield: r.u64(), issuerCount: r.u64(), bump: r.u8(),
+    // added after the first devnet deploy; older reserves have no cap
+    maxSupply: r.o + 8 <= data.length ? r.u64() : 0n,
   };
 }
 
@@ -197,12 +201,20 @@ export class Tender {
       .sort((a, b) => (b.supply > a.supply ? 1 : -1));
   }
 
+  /**
+   * Token balances read straight from account data (the amount sits at
+   * byte 64 for both token programs). Keyless RPCs often refuse
+   * getTokenAccountBalance; plain account reads always work. Missing
+   * accounts read as 0.
+   */
+  async tokenBalances(accounts: PublicKey[]): Promise<bigint[]> {
+    const infos = await this.connection.getMultipleAccountsInfo(accounts);
+    return infos.map((a) => (a && a.data.length >= 72 ? Buffer.from(a.data).readBigUInt64LE(64) : 0n));
+  }
+
   async vaultBalances(): Promise<{ usdc: bigint; tbill: bigint }> {
-    const [u, t] = await Promise.all([
-      this.connection.getTokenAccountBalance(this.usdcVault),
-      this.connection.getTokenAccountBalance(this.tbillVault),
-    ]);
-    return { usdc: BigInt(u.value.amount), tbill: BigInt(t.value.amount) };
+    const [usdc, tbill] = await this.tokenBalances([this.usdcVault, this.tbillVault]);
+    return { usdc, tbill };
   }
 
   // ---- instructions
@@ -310,6 +322,57 @@ export class Tender {
     ];
   }
 
+  updateReserve(admin: PublicKey, p: ReserveParams) {
+    return this.ix(
+      [
+        { pubkey: admin, isSigner: true, isWritable: false },
+        { pubkey: this.reserve, isSigner: false, isWritable: true },
+        { pubkey: this.usdcVault, isSigner: false, isWritable: false },
+        { pubkey: this.tbillVault, isSigner: false, isWritable: false },
+      ],
+      encodeParams(new W(), p).done("update_reserve"),
+    );
+  }
+
+  setAdmin(admin: PublicKey, newAdmin: PublicKey) {
+    return this.ix(
+      [
+        { pubkey: admin, isSigner: true, isWritable: false },
+        { pubkey: this.reserve, isSigner: false, isWritable: true },
+      ],
+      new W().key(newAdmin).done("set_admin"),
+    );
+  }
+
+  /** Params that keep everything as it is, for editing one field. */
+  currentParams(r: ReserveState): ReserveParams {
+    return {
+      priceAuthority: r.priceAuthority, allocator: r.allocator, treasury: r.treasury,
+      protocolFeeBps: r.protocolFeeBps, minLiquidBps: r.minLiquidBps, paused: r.paused,
+      tbillPrice: r.tbillPrice, maxSupply: r.maxSupply,
+    };
+  }
+
+  /** Collect the protocol fee, creating the treasury's USDC account if needed. */
+  collectProtocolFeeIxs(payer: PublicKey, r: ReserveState) {
+    const ata = this.usdcAta(r.treasury, r.usdcMint);
+    return [
+      createAssociatedTokenAccountIdempotentInstruction(payer, ata, r.treasury, r.usdcMint, this.usdcTokenProgram),
+      this.collectProtocolFee(r),
+    ];
+  }
+
+  /** Invest or divest, creating the allocator's token accounts if needed. */
+  rebalanceIxs(kind: "invest" | "divest", allocator: PublicKey, r: ReserveState, tbillAmount: bigint) {
+    const usdc = this.usdcAta(allocator, r.usdcMint);
+    const tbill = getAssociatedTokenAddressSync(r.tbillMint, allocator, true, this.tbillTokenProgram);
+    return [
+      createAssociatedTokenAccountIdempotentInstruction(allocator, usdc, allocator, r.usdcMint, this.usdcTokenProgram),
+      createAssociatedTokenAccountIdempotentInstruction(allocator, tbill, allocator, r.tbillMint, this.tbillTokenProgram),
+      this.rebalance(kind, allocator, r, tbillAmount),
+    ];
+  }
+
   collectProtocolFee(r: ReserveState) {
     return this.ix(
       [
@@ -357,7 +420,7 @@ export class Tender {
 
 function encodeParams(w: W, p: ReserveParams) {
   return w.key(p.priceAuthority).key(p.allocator).key(p.treasury)
-    .u16(p.protocolFeeBps).u16(p.minLiquidBps).bool(p.paused).u64(p.tbillPrice);
+    .u16(p.protocolFeeBps).u16(p.minLiquidBps).bool(p.paused).u64(p.tbillPrice).u64(p.maxSupply);
 }
 
 // ---- helpers -----------------------------------------------------------------------
@@ -405,13 +468,14 @@ export const ERRORS = [
   "Protocol fee is above the 20% cap",
   "Invalid reserve parameters",
   "Arithmetic overflow",
+  "This would take total supply over the reserve's cap",
 ];
 
 /** Turns a failed send into one readable sentence. */
 export function friendlyError(e: unknown): string {
   const err = e as { message?: string; logs?: string[] };
   const text = [err?.message ?? String(e), ...(err?.logs ?? [])].join("\n");
-  const anchor = text.match(/Error Message: ([^\n]+?)\.?(\n|$)/);
+  const anchor = text.match(/Error Message: ([^\n"]+?)\.?("|\n|$)/);
   if (anchor) return anchor[1];
   const hex = text.match(/custom program error: 0x([0-9a-f]+)/i);
   if (hex) {

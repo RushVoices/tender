@@ -46,7 +46,12 @@
     .routes-mini { font-family: var(--mono); font-size: 12px; color: var(--muted); }
     .empty { padding: 40px; text-align: center; color: var(--muted); }
     .wallet-pill { font-family: var(--mono); font-size: 13px; }
+    .admin-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; align-items: start; }
+    .h2 { font: 800 28px/1.1 var(--display); letter-spacing: -0.035em; margin: 6px 0 14px; }
+    .note { margin: 14px 0 0; line-height: 1.6; }
+    [hidden] { display: none !important; }
     @media (max-width: 960px) {
+      .admin-grid { grid-template-columns: 1fr; }
       .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .stats > div:nth-child(3) { border-right: 0; }
       .stats > div:nth-child(-n+3) { border-bottom: 1px solid var(--line); }
@@ -92,6 +97,7 @@
       <a href="#issue" data-tab="issue">Issue</a>
       <a href="#convert" data-tab="convert">Mint &amp; redeem</a>
       <a href="#dollars" data-tab="dollars">Dollars</a>
+      <a href="#admin" data-tab="admin" id="admin-tab" hidden>Admin</a>
     </div>
 
     <!-- issue -->
@@ -139,7 +145,7 @@
           <label class="field"><span>dollar</span><select class="input" id="c-issuer"></select></label>
           <label class="field"><span id="c-label">you pay (USDC)</span><input class="input big" id="c-amount" inputmode="decimal" placeholder="0.00" /></label>
           <div class="bal mono muted"><span id="c-bal">balance –</span><a id="c-max">max</a></div>
-          <div class="rows"><div class="row"><span id="c-get-label">you get</span><b id="c-get">0.00</b></div></div>
+          <div class="rows"><div class="row"><span id="c-get-label">you get</span><b id="c-get">0.00</b></div><div class="row" id="c-cap-row" hidden>room under the cap <b id="c-cap">–</b></div></div>
           <button class="btn" style="margin-top:20px;width:100%" id="c-submit" type="submit">Mint</button>
           <p class="mono muted" id="devnet-help" hidden style="margin:14px 0 0;line-height:1.6">Testing on devnet? Get free test USDC at <a href="https://faucet.circle.com" target="_blank" rel="noopener">faucet.circle.com</a> (pick Solana Devnet) and test SOL for fees at <a href="https://faucet.solana.com" target="_blank" rel="noopener">faucet.solana.com</a>.</p>
         </form>
@@ -152,6 +158,13 @@
 
     <!-- dollars -->
     <section class="pane" id="pane-dollars">
+      <form class="card" id="find-form" style="margin-bottom:18px" hidden>
+        <div id="find-row" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <span class="muted" style="flex:1 1 260px">This connection can't list every dollar. Find one by its symbol:</span>
+          <input class="input" id="find-symbol" placeholder="BONKUSD" maxlength="10" style="flex:0 1 200px" />
+          <button class="btn small" type="submit">Find</button>
+        </div>
+      </form>
       <div class="card table-wrap" style="padding:8px 12px">
         <table>
           <thead><tr><th>dollar</th><th>supply</th><th>ready to harvest</th><th>paid out</th><th>routes</th><th></th></tr></thead>
@@ -159,6 +172,66 @@
         </table>
       </div>
       <p class="mono muted" style="margin-top:14px">Harvest is permissionless. Anyone can press it, and it can only pay the dollar’s own routes.</p>
+    </section>
+    <!-- admin: only shown to the reserve's admin, price authority or allocator -->
+    <section class="pane" id="pane-admin">
+      <div class="admin-grid">
+        <form class="card" id="price-form" data-role="price">
+          <div class="mono muted">price authority</div>
+          <h2 class="h2">Treasury price</h2>
+          <div class="rows">
+            <div class="row">on-chain price <b id="ad-price">–</b></div>
+            <div class="row">last updated <b id="ad-updated">–</b></div>
+            <div class="row">market price (Jupiter) <b id="ad-ref">–</b></div>
+            <div class="row">allowed range now <b id="ad-range">–</b></div>
+          </div>
+          <label class="field" style="margin-top:14px"><span>new price (USDC per token)</span><input class="input" id="ad-new-price" inputmode="decimal" /></label>
+          <button class="btn" id="ad-price-btn" type="submit">Update price</button>
+          <p class="mono muted note">Moves at most 0.5% per update, at most once an hour. Update often (at least daily) so yield arrives in small steps.</p>
+        </form>
+
+        <form class="card" id="alloc-form" data-role="allocator">
+          <div class="mono muted">allocator</div>
+          <h2 class="h2">Treasuries</h2>
+          <div class="rows">
+            <div class="row">reserve USDC <b id="ad-v-usdc">–</b></div>
+            <div class="row">reserve <span class="tb-sym">USDY</span> <b id="ad-v-tbill">–</b></div>
+            <div class="row">liquid floor <b id="ad-floor">–</b></div>
+            <div class="row">you hold USDC <b id="ad-my-usdc">–</b></div>
+            <div class="row">you hold <span class="tb-sym">USDY</span> <b id="ad-my-tbill">–</b></div>
+          </div>
+          <label class="field" style="margin-top:14px"><span>amount of <span class="tb-sym">USDY</span></span><input class="input" id="ad-tbill-amt" inputmode="decimal" /></label>
+          <div class="bal mono muted"><span id="ad-tbill-usd">= 0.00 USDC at the reserve price</span><a id="ad-tbill-max">max invest</a></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn" type="button" id="ad-invest">Invest (USDY in, USDC out)</button>
+            <button class="btn ghost" type="button" id="ad-divest">Divest (USDC in, USDY out)</button>
+          </div>
+          <p class="mono muted note">Buy USDY with your own USDC on <a id="ad-jup" target="_blank" rel="noopener">Jupiter</a>, then invest it: the reserve swaps it for the same value in USDC at its price.</p>
+        </form>
+
+        <div class="card" data-role="any">
+          <div class="mono muted">anyone</div>
+          <h2 class="h2">Protocol fee</h2>
+          <div class="rows">
+            <div class="row">owed to treasury <b id="ad-owed">–</b></div>
+            <div class="row">treasury wallet <b id="ad-treasury">–</b></div>
+          </div>
+          <button class="btn yellow" type="button" id="ad-collect" style="margin-top:14px">Collect fee</button>
+        </div>
+
+        <form class="card" id="settings-form" data-role="admin">
+          <div class="mono muted">admin</div>
+          <h2 class="h2">Reserve settings</h2>
+          <label class="field"><span>protocol fee, % of yield (max 20)</span><input class="input" id="ad-fee" inputmode="decimal" /></label>
+          <label class="field"><span>liquid USDC floor, % of supply</span><input class="input" id="ad-minliq" inputmode="decimal" /></label>
+          <label class="field"><span>supply cap, dollars (0 = no cap)</span><input class="input" id="ad-cap" inputmode="decimal" /></label>
+          <label class="field"><span>price authority</span><input class="input" id="ad-pa" /></label>
+          <label class="field"><span>allocator</span><input class="input" id="ad-alloc" /></label>
+          <label class="field"><span>treasury (receives the fee)</span><input class="input" id="ad-tre" /></label>
+          <label style="display:flex;gap:10px;align-items:center;margin:4px 0 16px"><input type="checkbox" id="ad-paused" /> Pause new mints (redemptions keep working)</label>
+          <button class="btn" type="submit" id="ad-save">Save settings</button>
+        </form>
+      </div>
     </section>
   </main>
 

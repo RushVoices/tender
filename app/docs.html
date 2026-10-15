@@ -121,11 +121,11 @@
         <p>Then share the mint page: anyone can <a href="app.html#convert">mint</a> your dollar from there.</p>
         <h3>Run it yourself</h3>
         <p>The repo has the program (<code>programs/tender</code>, Rust and Anchor) and the site (<code>app/</code>, Vite and TypeScript). You need Rust, the Solana CLI 2.2 and Node 20+.</p>
-<pre><code># build and test the program (14 end-to-end tests in LiteSVM)
+<pre><code># build and test the program (15 end-to-end tests in LiteSVM)
 cargo build-sbf --manifest-path programs/tender/Cargo.toml
 cargo test -p tender --test integration
 
-# deploy to devnet
+# deploy (devnet shown; use -u mainnet-beta for mainnet)
 solana program deploy target/deploy/tender.so --program-id keys/tender-program-keypair.json
 
 # create the reserve (makes test USDC and Treasury mints on devnet)
@@ -247,13 +247,15 @@ npm run e2e</code></pre>
       <section id="accounts">
         <h2>Accounts and addresses</h2>
         <table>
-          <tr><th>account</th><th>seeds</th></tr>
-          <tr><td>program</td><td><code>Tnd4ZV5367L8r7DDxLH97bA64SkR4Ke1Lf6GZa9VwgJ</code></td></tr>
-          <tr><td>reserve</td><td><code>["reserve"]</code></td></tr>
-          <tr><td>USDC vault</td><td><code>["usdc_vault"]</code></td></tr>
-          <tr><td>Treasury vault</td><td><code>["tbill_vault"]</code></td></tr>
-          <tr><td>issuer</td><td><code>["issuer", symbol]</code></td></tr>
-          <tr><td>dollar mint</td><td><code>["mint", issuer]</code></td></tr>
+          <tr><th>account</th><th>seeds</th><th>mainnet address</th></tr>
+          <tr><td>program</td><td></td><td><code>Tnd4ZV5367L8r7DDxLH97bA64SkR4Ke1Lf6GZa9VwgJ</code></td></tr>
+          <tr><td>reserve</td><td><code>["reserve"]</code></td><td><code>9C4Tf22GakAo6STmU5JnrgFbTqJ5mgGKnWd2aEcqZyAa</code></td></tr>
+          <tr><td>USDC vault</td><td><code>["usdc_vault"]</code></td><td><code>DuorJxY9acRPQbGuBw6LbbGqkHuEXnWWuSeHci47YmNX</code></td></tr>
+          <tr><td>USDY vault</td><td><code>["tbill_vault"]</code></td><td><code>4AS2bXibt9bkn2o8YTcRyNWbNRpGAUVfgjUcBzKtJRuL</code></td></tr>
+          <tr><td>USDC mint</td><td></td><td><code>EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v</code></td></tr>
+          <tr><td>USDY mint (Ondo)</td><td></td><td><code>A1KLoBrKBde8Ty9qtNQUtq3C2ortoC3u7twggz7sEto6</code></td></tr>
+          <tr><td>issuer</td><td><code>["issuer", symbol]</code></td><td>one per dollar</td></tr>
+          <tr><td>dollar mint</td><td><code>["mint", issuer]</code></td><td>one per dollar</td></tr>
         </table>
         <h3>Units</h3>
         <ul>
@@ -282,6 +284,7 @@ npm run e2e</code></pre>
           <tr><td>6012</td><td>FeeTooHigh</td><td>Protocol fee above the 20% cap</td></tr>
           <tr><td>6013</td><td>BadParams</td><td>Invalid reserve parameters</td></tr>
           <tr><td>6014</td><td>Overflow</td><td>Arithmetic overflow</td></tr>
+          <tr><td>6015</td><td>CapReached</td><td>The mint would take total supply over the reserve’s cap</td></tr>
         </table>
       </section>
 
@@ -308,23 +311,25 @@ const ready = harvestable(reserve, issuer, usdc, tbill);</code></pre>
         <h2>Roles and limits</h2>
         <table>
           <tr><th>role</th><th>can</th><th>can’t</th></tr>
-          <tr><td>admin</td><td>set roles, fee, floor; pause mints</td><td>take USDC, pause redemptions, mint dollars, set a fee above 20%</td></tr>
+          <tr><td>admin</td><td>set roles, fee, floor and supply cap; pause mints</td><td>take USDC, pause redemptions, mint dollars, set a fee above 20%</td></tr>
           <tr><td>price authority</td><td>move the Treasury price ±0.5% an hour</td><td>move it faster, or touch any funds</td></tr>
           <tr><td>allocator</td><td>swap USDC ↔ Treasuries at the reserve price</td><td>take value out, or go below the liquidity floor</td></tr>
           <tr><td>issuer authority</td><td>change its own routes</td><td>mint its dollar without USDC, or touch the reserve</td></tr>
         </table>
-        <p>Before mainnet, every role should sit behind a multisig (for example Squads), and so should the program’s upgrade authority.</p>
+        <p>The admin, price authority and allocator run the reserve from the app’s <a href="app.html#admin">Admin</a> tab, which appears only for those wallets. It suggests each price update from USDY’s live market price on Jupiter.</p>
+        <p><strong>The upgrade authority outranks every row above.</strong> Whoever holds it can replace the program, so holders are trusting that wallet with everything in the reserve. Moving it, and the admin role, to a multisig (for example Squads) is the next step for safety.</p>
       </section>
 
       <section id="risks">
         <h2>Risks</h2>
-        <div class="callout"><strong>Unaudited.</strong> The program has 14 end-to-end tests, and the site’s client passes a full run on a local validator. It has not been audited. Use devnet until it is.</div>
+        <div class="callout"><strong>Unaudited.</strong> The program has 15 end-to-end tests, and the site’s client passes full runs on a local validator and on devnet. It has not been audited. The reserve has a supply cap so that no more than a set amount of USDC can be at risk while that’s true.</div>
         <ul>
-          <li><strong>Treasury token risk.</strong> If the tokenized Treasury loses value or freezes, the reserve can be worth less than it owes. Yield stops first. Beyond that, the last redeemers bear the loss.</li>
-          <li><strong>Price authority.</strong> The Treasury price comes from a trusted signer, bounded to 0.5% an hour. An overstated price counts yield that isn’t there. Plug in an oracle or a NAV feed before mainnet.</li>
+          <li><strong>Treasury token risk.</strong> The reserve’s Treasury token is Ondo’s USDY. Ondo can freeze USDY accounts, and USDY isn’t offered to US persons. If USDY loses value or the vault is frozen, the reserve can be worth less than it owes. Yield stops first. Beyond that, the last redeemers bear the loss.</li>
+          <li><strong>Price authority.</strong> The USDY price comes from a trusted signer, bounded to 0.5% an hour; the Admin tab suggests USDY’s market price from Jupiter. An overstated price counts yield that isn’t there.</li>
+          <li><strong>Price steps.</strong> Each update adds yield in one step. Someone could mint just before a step, take a share of it for their own dollar, and redeem after. Updating at least daily keeps each step too small to be worth it.</li>
           <li><strong>Allocator.</strong> It trades at the reserve’s price. If that price is stale it could trade against the reserve, up to the 0.5%-an-hour band.</li>
           <li><strong>Liquidity.</strong> Redemptions need liquid USDC. A run larger than the floor waits on the allocator to divest.</li>
-          <li><strong>USDC.</strong> Every dollar is ultimately a claim on USDC, with all of USDC’s own risks.</li>
+          <li><strong>USDC.</strong> Every dollar is ultimately a claim on USDC, with all of USDC’s own risks. Circle can freeze USDC accounts, the reserve’s vault included.</li>
           <li><strong>Regulation.</strong> Issuing dollar-like tokens and passing on Treasury yield may be regulated where you or your users are. Get legal advice.</li>
         </ul>
         <div class="next"><a class="btn" href="app.html#issue">Issue a dollar &rarr;</a></div>

@@ -9,10 +9,15 @@ import {
   DEFAULT_PROGRAM_ID, ROUTE_DOLLAR, ROUTE_USDC, Tender, formatUsd, friendlyError, harvestable, parseUsd,
   reserveValue, validSymbol, type IssuerState, type ReserveState, type Route,
 } from "./chain/tender";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { connectWallet, disconnectWallet, signAndSend, walletKey } from "./chain/wallet";
 
-const RPC = import.meta.env.VITE_RPC_URL || "https://api.devnet.solana.com";
-const CLUSTER = import.meta.env.VITE_CLUSTER || "devnet";
+const CLUSTER = import.meta.env.VITE_CLUSTER || "mainnet-beta";
+const RPC = import.meta.env.VITE_RPC_URL ||
+    // Solana's own mainnet RPC refuses requests from websites; PublicNode
+  // allows them but won't list every dollar (getProgramAccounts).
+  (CLUSTER === "devnet" ? "https://api.devnet.solana.com" : "https://solana-rpc.publicnode.com");
+const TBILL_SYMBOL = import.meta.env.VITE_TBILL_SYMBOL || "USDY";
 const PROGRAM = import.meta.env.VITE_PROGRAM_ID ? new PublicKey(import.meta.env.VITE_PROGRAM_ID) : DEFAULT_PROGRAM_ID;
 
 const conn = new Connection(RPC, "confirmed");
@@ -72,7 +77,7 @@ function needReserve(): ReserveState {
 
 function showTab() {
   const tab = (location.hash.slice(1).split("?")[0] || "issue") as string;
-  const name = ["issue", "convert", "dollars"].includes(tab) ? tab : "issue";
+  const name = ["issue", "convert", "dollars", "admin"].includes(tab) ? tab : "issue";
   document.querySelectorAll(".pane").forEach((p) => p.classList.toggle("on", p.id === `pane-${name}`));
   document.querySelectorAll("[data-tab]").forEach((a) => a.classList.toggle(a.closest(".tabs") ? "on" : "active", (a as HTMLElement).dataset.tab === name));
   const q = new URLSearchParams(location.hash.split("?")[1] || "");
@@ -95,6 +100,7 @@ async function onWallet() {
   if (k && !document.querySelector("#routes .route")) addRoute({ wallet: k, bps: 10_000, kind: ROUTE_USDC });
   await refreshBalances();
   renderDollars();
+  renderAdmin();
 }
 $("#connect").addEventListener("click", async () => {
   try {
@@ -116,18 +122,59 @@ async function refresh() {
     return;
   }
   if (!reserve) {
-    showNotice(`No Tender reserve found for program <code>${short(PROGRAM)}</code> on <code>${RPC}</code>. Deploy the program and run <code>scripts/init-reserve.ts</code> (see <a href="/docs.html#quickstart">Quickstart</a>).`);
+    showNotice(`No Tender reserve found for program <code>${short(PROGRAM)}</code> on <code>${RPC}</code>. Deploy the program and run <code>scripts/init-reserve.ts</code> (see <a href="docs.html#quickstart">Quickstart</a>).`);
     issuers = [];
   } else {
     $("#notice").classList.remove("show");
-    [vaults, issuers] = await Promise.all([t.vaultBalances(), t.fetchIssuers()]);
+    vaults = await t.vaultBalances();
+    try {
+      issuers = await t.fetchIssuers();
+      canList = true;
+    } catch {
+      // Keyless RPCs refuse getProgramAccounts. Show the dollars named in
+      // the link or looked up before, and offer a search by symbol.
+      canList = false;
+      const want = new URLSearchParams(location.hash.split("?")[1] || "").get("dollar");
+      if (want) remember(want);
+      const found = await Promise.all(known().map((s) => t.fetchIssuer(s).catch(() => null)));
+      issuers = found.filter((x): x is IssuerState => !!x);
+    }
+    $("#find-form").hidden = canList;
     if (reserve.paused) showNotice("Minting is paused by the reserve admin. Redemptions still work.");
   }
   renderStats();
   renderIssuerSelect();
   renderDollars();
   await refreshBalances();
+  renderAdmin();
 }
+
+// ---------------------------------------------------------------- dollars this browser knows about
+
+let canList = true;
+const KNOWN = "tender.known";
+function known(): string[] {
+  try { return JSON.parse(localStorage.getItem(KNOWN) || "[]"); } catch { return []; }
+}
+function remember(symbol: string) {
+  const s = symbol.toUpperCase();
+  if (!validSymbol(s)) return;
+  try { localStorage.setItem(KNOWN, JSON.stringify([s, ...known().filter((x) => x !== s)].slice(0, 50))); } catch { /* storage off */ }
+}
+
+$("#find-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const input = $<HTMLInputElement>("#find-symbol");
+  const sym = input.value.trim().toUpperCase();
+  if (!validSymbol(sym)) return toast("Symbols are 2-10 letters or digits", true);
+  const i = await t.fetchIssuer(sym).catch(() => null);
+  if (!i) return toast(`No dollar called ${sym} yet`, true);
+  remember(sym);
+  if (!issuers.some((x) => x.symbol === sym)) issuers.unshift(i);
+  input.value = "";
+  renderDollars();
+  renderIssuerSelect();
+});
 
 function showNotice(html: string) {
   const n = $("#notice");
@@ -249,6 +296,7 @@ $("#issue-form").addEventListener("submit", (e) => {
     const routes = readRoutes();
     if (routes.reduce((a, r) => a + r.bps, 0) !== 10_000) throw new Error("Route shares must add up to 100%");
     const sig = await signAndSend(conn, [t.createIssuer(me, { name, symbol, uri, routes })]);
+    remember(symbol);
     location.hash = `convert?dollar=${symbol}`;
     return sig;
   });
@@ -282,7 +330,7 @@ function renderIssuerSelect() {
 $("#c-issuer").addEventListener("change", () => refreshBalances());
 
 async function tokenBal(acct: PublicKey) {
-  try { return BigInt((await conn.getTokenAccountBalance(acct)).value.amount); } catch { return 0n; }
+  try { return (await t.tokenBalances([acct]))[0]; } catch { return 0n; }
 }
 
 async function refreshBalances() {
@@ -309,6 +357,9 @@ function renderConvert() {
   let get = "0.00";
   try { const v = $<HTMLInputElement>("#c-amount").value; if (v) get = formatUsd(parseUsd(v)); } catch { get = "–"; }
   $("#c-get").textContent = get;
+  const cap = reserve?.maxSupply ?? 0n;
+  $("#c-cap-row").hidden = !(minting && cap > 0n);
+  if (reserve && cap > 0n) $("#c-cap").textContent = formatUsd(cap > reserve.totalSupply ? cap - reserve.totalSupply : 0n);
 }
 $("#c-amount").addEventListener("input", renderConvert);
 $("#c-max").addEventListener("click", () => {
@@ -325,6 +376,8 @@ $("#convert-form").addEventListener("submit", (e) => {
     if (!i) throw new Error("Pick a dollar");
     const amount = parseUsd($<HTMLInputElement>("#c-amount").value);
     if (amount <= 0n) throw new Error("Enter an amount");
+    if (mode === "mint" && r.maxSupply > 0n && r.totalSupply + amount > r.maxSupply)
+      throw new Error(`The reserve's cap leaves room for ${formatUsd(r.maxSupply > r.totalSupply ? r.maxSupply - r.totalSupply : 0n)} more`);
     if (mode === "mint" && amount > bals.usdc) throw new Error("You don't have that much USDC");
     if (mode === "redeem" && amount > bals.dollar) throw new Error(`You don't have that much ${i.symbol}`);
     if (mode === "redeem" && amount > vaults.usdc) throw new Error("The reserve doesn't hold enough liquid USDC right now");
@@ -343,7 +396,12 @@ function escapeHtml(s: string) {
 function renderDollars() {
   const body = $("#dollar-rows");
   if (!reserve) { body.innerHTML = `<tr><td colspan="6" class="empty">No reserve on this cluster.</td></tr>`; return; }
-  if (!issuers.length) { body.innerHTML = `<tr><td colspan="6" class="empty">No dollars yet. <a href="#issue">Issue the first one.</a></td></tr>`; return; }
+  if (!issuers.length) {
+    body.innerHTML = canList
+      ? `<tr><td colspan="6" class="empty">No dollars yet. <a href="#issue">Issue the first one.</a></td></tr>`
+      : `<tr><td colspan="6" class="empty">Find a dollar by its symbol above, or <a href="#issue">issue one</a>.</td></tr>`;
+    return;
+  }
   const me = walletKey();
   body.innerHTML = issuers.map((i, n) => {
     const ready = harvestable(reserve!, i, vaults.usdc, vaults.tbill);
@@ -371,6 +429,185 @@ function renderDollars() {
     b.addEventListener("click", () => startEdit(issuers[Number(b.dataset.edit)])),
   );
 }
+
+// ---------------------------------------------------------------- admin
+
+const PRICE_SCALE = 1_000_000_000n;
+let refPrice: number | null = null;
+let myTbill = 0n, myUsdc = 0n;
+
+const priceToNum = (p: bigint) => Number(p) / 1e9;
+const numToPrice = (n: number) => BigInt(Math.round(n * 1e9));
+
+/** Live market price of the Treasury token from Jupiter, in USD. */
+async function loadRefPrice(mint: PublicKey) {
+  try {
+    const r = await fetch(`https://lite-api.jup.ag/price/v3?ids=${mint.toBase58()}`);
+    const j = await r.json();
+    const p = Number(j[mint.toBase58()]?.usdPrice);
+    refPrice = p > 0 ? p : null;
+  } catch { refPrice = null; }
+}
+/** The price an update may set right now, closest to the market price. */
+function suggestedPrice(r: ReserveState): bigint | null {
+  if (refPrice == null) return null;
+  const lo = (r.tbillPrice * 9950n) / 10_000n, hi = (r.tbillPrice * 10050n) / 10_000n;
+  const want = numToPrice(refPrice);
+  return want < lo ? lo : want > hi ? hi : want;
+}
+
+async function renderAdmin() {
+  const me = walletKey();
+  const r = reserve;
+  const roles = {
+    admin: !!(me && r && r.admin.equals(me)),
+    price: !!(me && r && r.priceAuthority.equals(me)),
+    allocator: !!(me && r && r.allocator.equals(me)),
+  };
+  const any = roles.admin || roles.price || roles.allocator;
+  $("#admin-tab").hidden = !any;
+  if (!any || !r) return;
+  document.querySelectorAll<HTMLElement>("#pane-admin [data-role]").forEach((el) => {
+    const role = el.dataset.role!;
+    el.hidden = role === "price" ? !roles.price : role === "allocator" ? !roles.allocator : role === "admin" ? !roles.admin : false;
+  });
+  document.querySelectorAll(".tb-sym").forEach((e) => (e.textContent = TBILL_SYMBOL));
+  ($("#ad-jup") as HTMLAnchorElement).href = `https://jup.ag/swap/${r.usdcMint.toBase58()}-${r.tbillMint.toBase58()}`;
+
+  // price
+  if (refPrice == null) await loadRefPrice(r.tbillMint);
+  $("#ad-price").textContent = `$${priceToNum(r.tbillPrice).toFixed(6)}`;
+  const updated = new Date(Number(r.priceUpdatedAt) * 1000);
+  const next = new Date((Number(r.priceUpdatedAt) + 3600) * 1000);
+  $("#ad-updated").textContent = updated.toLocaleString() + (next > new Date() ? ` · next after ${next.toLocaleTimeString()}` : "");
+  $("#ad-ref").textContent = refPrice == null ? "unavailable" : `$${refPrice.toFixed(6)}`;
+  $("#ad-range").textContent = `$${priceToNum((r.tbillPrice * 9950n) / 10_000n).toFixed(6)} – $${priceToNum((r.tbillPrice * 10050n) / 10_000n).toFixed(6)}`;
+  const priceInput = $<HTMLInputElement>("#ad-new-price");
+  const sug = suggestedPrice(r);
+  if (!priceInput.value && sug) priceInput.value = priceToNum(sug).toFixed(6);
+
+  // treasuries
+  $("#ad-v-usdc").textContent = formatUsd(vaults.usdc);
+  $("#ad-v-tbill").textContent = `${formatUsd(vaults.tbill)} ($${formatUsd(reserveValue(r, 0n, vaults.tbill))})`;
+  const floor = (r.totalSupply * BigInt(r.minLiquidBps)) / 10_000n;
+  $("#ad-floor").textContent = `${formatUsd(floor)} (${r.minLiquidBps / 100}% of supply)`;
+  if (me) {
+    myUsdc = await tokenBal(t.usdcAta(me, r.usdcMint));
+    myTbill = await tokenBal(getAssociatedTokenAddressSync(r.tbillMint, me, true));
+  }
+  $("#ad-my-usdc").textContent = formatUsd(myUsdc);
+  $("#ad-my-tbill").textContent = formatUsd(myTbill);
+  renderTbillUsd();
+
+  // fee
+  $("#ad-owed").textContent = formatUsd(r.protocolOwed, 6);
+  $("#ad-treasury").textContent = short(r.treasury);
+
+  // settings (only fill once so edits aren't overwritten by refreshes)
+  const fee = $<HTMLInputElement>("#ad-fee");
+  if (!fee.dataset.filled) {
+    fee.dataset.filled = "1";
+    fee.value = String(r.protocolFeeBps / 100);
+    $<HTMLInputElement>("#ad-minliq").value = String(r.minLiquidBps / 100);
+    $<HTMLInputElement>("#ad-cap").value = formatUsd(r.maxSupply, 0).replace(/,/g, "");
+    $<HTMLInputElement>("#ad-pa").value = r.priceAuthority.toBase58();
+    $<HTMLInputElement>("#ad-alloc").value = r.allocator.toBase58();
+    $<HTMLInputElement>("#ad-tre").value = r.treasury.toBase58();
+    $<HTMLInputElement>("#ad-paused").checked = r.paused;
+  }
+}
+
+function tbillAmount(): bigint {
+  return parseUsd($<HTMLInputElement>("#ad-tbill-amt").value || "0");
+}
+function renderTbillUsd() {
+  if (!reserve) return;
+  let v = 0n;
+  try { v = (tbillAmount() * reserve.tbillPrice) / PRICE_SCALE; } catch { /* ignore */ }
+  $("#ad-tbill-usd").textContent = `= ${formatUsd(v)} USDC at the reserve price`;
+}
+$("#ad-tbill-amt").addEventListener("input", renderTbillUsd);
+$("#ad-tbill-max").addEventListener("click", () => {
+  const r = reserve;
+  if (!r) return;
+  const floor = (r.totalSupply * BigInt(r.minLiquidBps)) / 10_000n;
+  const room = vaults.usdc > floor ? vaults.usdc - floor : 0n;
+  let amt = (room * PRICE_SCALE) / r.tbillPrice;
+  if (amt > myTbill) amt = myTbill;
+  $<HTMLInputElement>("#ad-tbill-amt").value = formatUsd(amt, 6).replace(/,/g, "");
+  renderTbillUsd();
+});
+
+$("#price-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  run($<HTMLButtonElement>("#ad-price-btn"), "Updating…", async () => {
+    const me = needWallet();
+    const r = needReserve();
+    const n = Number($<HTMLInputElement>("#ad-new-price").value);
+    if (!(n > 0)) throw new Error("Enter a price like 1.152");
+    const p = numToPrice(n);
+    const diff = p > r.tbillPrice ? p - r.tbillPrice : r.tbillPrice - p;
+    if (diff * 10_000n > r.tbillPrice * 50n) throw new Error("That's more than 0.5% from the current price. Step towards it over several updates.");
+    if (Date.now() / 1000 - Number(r.priceUpdatedAt) < 3600) throw new Error("The price was updated less than an hour ago");
+    const sig = await signAndSend(conn, [t.updatePrice(me, p)]);
+    $<HTMLInputElement>("#ad-new-price").value = "";
+    return sig;
+  });
+});
+
+for (const kind of ["invest", "divest"] as const) {
+  $(`#ad-${kind}`).addEventListener("click", () =>
+    run($<HTMLButtonElement>(`#ad-${kind}`), kind === "invest" ? "Investing…" : "Divesting…", async () => {
+      const me = needWallet();
+      const r = needReserve();
+      const amt = tbillAmount();
+      if (amt <= 0n) throw new Error(`Enter an amount of ${TBILL_SYMBOL}`);
+      const usd = (amt * r.tbillPrice) / PRICE_SCALE;
+      if (kind === "invest" && amt > myTbill) throw new Error(`You hold ${formatUsd(myTbill)} ${TBILL_SYMBOL}`);
+      if (kind === "divest" && usd + 1n > myUsdc) throw new Error(`Divesting needs ${formatUsd(usd + 1n)} USDC in your wallet`);
+      if (kind === "divest" && amt > vaults.tbill) throw new Error(`The reserve holds ${formatUsd(vaults.tbill)} ${TBILL_SYMBOL}`);
+      const sig = await signAndSend(conn, t.rebalanceIxs(kind, me, r, amt));
+      $<HTMLInputElement>("#ad-tbill-amt").value = "";
+      return sig;
+    }),
+  );
+}
+
+$("#ad-collect").addEventListener("click", () =>
+  run($<HTMLButtonElement>("#ad-collect"), "Collecting…", async () => {
+    const me = needWallet();
+    const r = needReserve();
+    return signAndSend(conn, t.collectProtocolFeeIxs(me, r));
+  }),
+);
+
+$("#settings-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  run($<HTMLButtonElement>("#ad-save"), "Saving…", async () => {
+    const me = needWallet();
+    const r = needReserve();
+    const pct = (id: string, max: number) => {
+      const n = Number($<HTMLInputElement>(id).value);
+      if (!(n >= 0 && n <= max)) throw new Error(`Enter a percentage from 0 to ${max}`);
+      return Math.round(n * 100);
+    };
+    const key = (id: string) => {
+      try { return new PublicKey($<HTMLInputElement>(id).value.trim()); } catch { throw new Error("One of the wallet addresses isn't valid"); }
+    };
+    const sig = await signAndSend(conn, [t.updateReserve(me, {
+      ...t.currentParams(r),
+      protocolFeeBps: pct("#ad-fee", 20),
+      minLiquidBps: pct("#ad-minliq", 100),
+      maxSupply: parseUsd($<HTMLInputElement>("#ad-cap").value || "0"),
+      priceAuthority: key("#ad-pa"),
+      allocator: key("#ad-alloc"),
+      treasury: key("#ad-tre"),
+      paused: $<HTMLInputElement>("#ad-paused").checked,
+    })]);
+    delete $<HTMLInputElement>("#ad-fee").dataset.filled;
+    return sig;
+  });
+});
 
 // ---------------------------------------------------------------- boot
 

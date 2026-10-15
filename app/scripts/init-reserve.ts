@@ -3,11 +3,12 @@
 //   RPC_URL=https://api.devnet.solana.com npx tsx scripts/init-reserve.ts \
 //     [--usdc <mint>] [--tbill <mint>] [--treasury <wallet>] [--price-authority <wallet>] \
 //     [--allocator <wallet>] [--fee-bps 1000] [--min-liquid-bps 2000] [--tbill-price 1.0] \
-//     [--keypair ~/.config/solana/id.json]
+//     [--max-supply 10000] [--admin <wallet>] [--keypair ~/.config/solana/id.json]
 //
 // Without --usdc / --tbill it creates test mints you control (devnet only),
 // mints yourself 10,000 of each, and prints their addresses. The keypair
-// becomes the reserve admin and, unless given, every other role.
+// becomes the reserve admin and, unless given, every other role. With
+// --admin, admin is handed to that wallet in the same transaction.
 
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -46,8 +47,11 @@ async function main() {
     minLiquidBps: Number(args.get("min-liquid-bps") ?? 2000),
     paused: false,
     tbillPrice: price,
+    maxSupply: BigInt(Math.round(Number(args.get("max-supply") ?? "0") * 1e6)),
   });
-  const sig = await sendAndConfirmTransaction(conn, new Transaction().add(ix), [admin]);
+  const tx = new Transaction().add(ix);
+  if (args.get("admin")) tx.add(t.setAdmin(admin.publicKey, new PublicKey(args.get("admin")!)));
+  const sig = await sendAndConfirmTransaction(conn, tx, [admin]);
   console.log(`reserve: ${t.reserve.toBase58()}\nusdc vault: ${t.usdcVault.toBase58()}\ntx: ${sig}`);
 }
 

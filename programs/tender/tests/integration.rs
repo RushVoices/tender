@@ -142,6 +142,7 @@ impl Env {
             min_liquid_bps: 2_000,   // keep 20% of supply liquid
             paused: false,
             tbill_price: PRICE_ONE,
+            max_supply: 0,
         }
     }
 
@@ -776,4 +777,44 @@ fn many_conversions_stay_solvent() {
     }
     env.assert_solvent();
     assert_eq!(env.reserve().total_supply, 0);
+}
+
+#[test]
+fn supply_cap_limits_mints_but_not_redemptions_or_yield() {
+    let mut env = setup();
+    let payee = env.wallet().pubkey();
+    let creator = env.wallet();
+    env.create_issuer(
+        &creator,
+        "Cap dollar",
+        "CAPUSD",
+        vec![Route { wallet: payee, bps: 10_000, kind: ROUTE_DOLLAR }],
+    )
+    .unwrap();
+    let mut p = env.params();
+    p.max_supply = 1_000 * USD;
+    env.update_reserve(p.clone()).unwrap();
+    let alice = user(&mut env, "CAPUSD", 2_000 * USD);
+    mint(&mut env, &alice, "CAPUSD", 1_000 * USD).unwrap();
+    assert!(mint(&mut env, &alice, "CAPUSD", 1).is_err());
+
+    // yield minted as new dollars may take supply past the cap
+    let usdc_mint = env.usdc;
+    env.fund(&usdc_mint, &usdc_vault(), 10 * USD);
+    let dest = env.token_account(&mint_pda(&issuer_pda("CAPUSD")), &payee, &spl_token_2022::ID);
+    let keeper = env.wallet();
+    env.harvest(&keeper, "CAPUSD", &[dest]).unwrap();
+    assert_eq!(env.balance(&dest), 9 * USD);
+    assert!(env.reserve().total_supply > 1_000 * USD);
+
+    // redemptions still work, and free up room under the cap
+    redeem(&mut env, &alice, "CAPUSD", 500 * USD).unwrap();
+    assert!(mint(&mut env, &alice, "CAPUSD", 500 * USD).is_err()); // 1,009 - 500 + 500 > 1,000
+    mint(&mut env, &alice, "CAPUSD", 491 * USD).unwrap();
+
+    // 0 lifts the cap
+    p.max_supply = 0;
+    env.update_reserve(p).unwrap();
+    mint(&mut env, &alice, "CAPUSD", 9 * USD).unwrap();
+    env.assert_solvent();
 }

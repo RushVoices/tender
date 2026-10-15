@@ -1,6 +1,6 @@
 // Injected-wallet support (Phantom, Solflare and Backpack all expose this
 // shape). Swap in @solana/wallet-adapter if you want a wallet picker.
-import { Connection, PublicKey, Transaction, type TransactionInstruction } from "@solana/web3.js";
+import { ComputeBudgetProgram, Connection, PublicKey, Transaction, type TransactionInstruction } from "@solana/web3.js";
 
 export interface InjectedWallet {
   publicKey: PublicKey | null;
@@ -47,10 +47,19 @@ export const walletKey = () => pubkey;
 export async function signAndSend(conn: Connection, ixs: TransactionInstruction[]): Promise<string> {
   if (!wallet || !pubkey) throw new Error("Connect a wallet first.");
   const { blockhash, lastValidBlockHeight } = await conn.getLatestBlockhash("confirmed");
-  const tx = new Transaction({ feePayer: pubkey, blockhash, lastValidBlockHeight }).add(...ixs);
+  // A small priority fee (~0.00001 SOL) so it lands when mainnet is busy.
+  const tx = new Transaction({ feePayer: pubkey, blockhash, lastValidBlockHeight })
+    .add(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 50_000 }), ...ixs);
   const signed = await wallet.signTransaction(tx);
   const sig = await conn.sendRawTransaction(signed.serialize());
-  const res = await conn.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
-  if (res.value.err) throw new Error(`Transaction failed: ${JSON.stringify(res.value.err)}`);
-  return sig;
+  // Poll rather than subscribe: keyless RPCs don't always offer websockets.
+  for (;;) {
+    const { value: [status] } = await conn.getSignatureStatuses([sig]);
+    if (status?.err) throw new Error(`Transaction failed: ${JSON.stringify(status.err)}`);
+    if (status && (status.confirmationStatus === "confirmed" || status.confirmationStatus === "finalized")) return sig;
+    if ((await conn.getBlockHeight("confirmed")) > lastValidBlockHeight) {
+      throw new Error("The transaction expired before it landed. Nothing was charged; try again.");
+    }
+    await new Promise((r) => setTimeout(r, 1200));
+  }
 }
