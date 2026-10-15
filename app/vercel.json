@@ -4,12 +4,12 @@
   "outputDirectory": "dist",
   "cleanUrls": true,
   "rewrites": [
-    { "source": "/issue/:symbol?", "destination": "/app.html" },
-    { "source": "/mint/:symbol?", "destination": "/app.html" },
-    { "source": "/dollars", "destination": "/app.html" },
-    { "source": "/admin", "destination": "/app.html" },
-    { "source": "/docs/:section", "destination": "/docs.html" },
-    { "source": "/reserve", "destination": "/index.html" }
+    { "source": "/issue/:symbol?", "destination": "/app" },
+    { "source": "/mint/:symbol?", "destination": "/app" },
+    { "source": "/dollars", "destination": "/app" },
+    { "source": "/admin", "destination": "/app" },
+    { "source": "/docs/:section", "destination": "/docs" },
+    { "source": "/reserve", "destination": "/" }
   ],
   "redirects": [
     { "source": "/app", "destination": "/issue", "permanent": true }
