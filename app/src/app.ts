@@ -12,13 +12,39 @@ import {
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { connectWallet, disconnectWallet, signAndSend, walletKey } from "./chain/wallet";
 
-const CLUSTER = import.meta.env.VITE_CLUSTER || "mainnet-beta";
-const RPC = import.meta.env.VITE_RPC_URL ||
-    // Solana's own mainnet RPC refuses requests from websites; PublicNode
-  // allows them but won't list every dollar (getProgramAccounts).
-  (CLUSTER === "devnet" ? "https://api.devnet.solana.com" : "https://solana-rpc.publicnode.com");
+const CLUSTER = (import.meta.env.VITE_CLUSTER || "mainnet-beta").trim();
+// Solana's own mainnet RPC refuses requests from websites; PublicNode allows
+// them but won't list every dollar (getProgramAccounts).
+const DEFAULT_RPC = CLUSTER === "devnet" ? "https://api.devnet.solana.com" : "https://solana-rpc.publicnode.com";
+/** Problems with the site's settings, shown in the notice instead of crashing. */
+const configProblems: string[] = [];
+
+/**
+ * VITE_RPC_URL may be a full URL or just a Helius API key. Anything else is
+ * ignored (with a notice) so a bad setting never stops the page from working.
+ */
+function resolveRpc(raw: string | undefined): string {
+  const v = (raw || "").trim().replace(/^["']|["']$/g, "");
+  if (!v) return DEFAULT_RPC;
+  if (/^https?:\/\//i.test(v)) return v;
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)) {
+    return `https://${CLUSTER === "devnet" ? "devnet" : "mainnet"}.helius-rpc.com/?api-key=${v}`;
+  }
+  configProblems.push("<code>VITE_RPC_URL</code> isn't a URL or a Helius key, so the site is using a public connection instead.");
+  return DEFAULT_RPC;
+}
+function resolveProgram(raw: string | undefined): PublicKey {
+  const v = (raw || "").trim();
+  if (!v) return DEFAULT_PROGRAM_ID;
+  try { return new PublicKey(v); } catch {
+    configProblems.push("<code>VITE_PROGRAM_ID</code> isn't a valid address, so the site is using the default program.");
+    return DEFAULT_PROGRAM_ID;
+  }
+}
+
+const RPC = resolveRpc(import.meta.env.VITE_RPC_URL);
 const TBILL_SYMBOL = import.meta.env.VITE_TBILL_SYMBOL || "USDY";
-const PROGRAM = import.meta.env.VITE_PROGRAM_ID ? new PublicKey(import.meta.env.VITE_PROGRAM_ID) : DEFAULT_PROGRAM_ID;
+const PROGRAM = resolveProgram(import.meta.env.VITE_PROGRAM_ID);
 
 const conn = new Connection(RPC, "confirmed");
 const t = new Tender(conn, PROGRAM);
@@ -142,6 +168,7 @@ async function refresh() {
     $("#find-form").hidden = canList;
     if (reserve.paused) showNotice("Minting is paused by the reserve admin. Redemptions still work.");
   }
+  if (configProblems.length) showNotice(configProblems.join("<br>"));
   renderStats();
   renderIssuerSelect();
   renderDollars();
