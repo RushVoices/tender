@@ -22,7 +22,7 @@ tickerInput.addEventListener("input", () => {
   if (c !== tickerInput.value) tickerInput.value = c;
   ticker = c || "YOURUSD";
   document.querySelectorAll("[data-sym]").forEach((el) => (el.textContent = ticker));
-  document.querySelectorAll<HTMLAnchorElement>('a[href^="app.html#issue"]').forEach((a) => (a.href = `app.html#issue?symbol=${ticker}`));
+  document.querySelectorAll<HTMLAnchorElement>('a[href^="/issue"]').forEach((a) => (a.href = `/issue/${ticker}`));
   drawFace();
 });
 
@@ -552,3 +552,19 @@ function loop(now: number) {
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
+
+// /reserve is the landing page scrolled to the reserve section.
+function showReserve(smooth: boolean) {
+  document.getElementById("reserve")?.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
+}
+if (location.pathname === "/reserve" || location.hash === "#reserve") {
+  history.replaceState(null, "", "/reserve");
+  requestAnimationFrame(() => showReserve(false));
+}
+document.querySelectorAll<HTMLAnchorElement>('a[href="/reserve"]').forEach((a) =>
+  a.addEventListener("click", (e) => {
+    e.preventDefault();
+    history.pushState(null, "", "/reserve");
+    showReserve(true);
+  }),
+);

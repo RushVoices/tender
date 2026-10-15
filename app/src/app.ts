@@ -105,19 +105,57 @@ function needReserve(): ReserveState {
 
 // ---------------------------------------------------------------- tabs
 
-function showTab() {
-  const tab = (location.hash.slice(1).split("?")[0] || "issue") as string;
-  const name = ["issue", "convert", "dollars", "admin"].includes(tab) ? tab : "issue";
-  document.querySelectorAll(".pane").forEach((p) => p.classList.toggle("on", p.id === `pane-${name}`));
-  document.querySelectorAll("[data-tab]").forEach((a) => a.classList.toggle(a.closest(".tabs") ? "on" : "active", (a as HTMLElement).dataset.tab === name));
-  const q = new URLSearchParams(location.hash.split("?")[1] || "");
-  if (q.get("symbol") && name === "issue" && !editing) {
-    $<HTMLInputElement>("#f-symbol").value = q.get("symbol")!.toUpperCase().slice(0, 10);
-    $("#coin-sym").textContent = $<HTMLInputElement>("#f-symbol").value;
-  }
-  if (q.get("dollar") && name === "convert") $<HTMLSelectElement>("#c-issuer").value = q.get("dollar")!;
+// Clean addresses: /issue[/SYMBOL], /mint[/SYMBOL], /dollars, /admin.
+const TABS = ["issue", "mint", "dollars", "admin"] as const;
+type Tab = (typeof TABS)[number];
+
+function route(): { tab: Tab; symbol: string } {
+  const [, first = "", second = ""] = location.pathname.split("/");
+  const tab = (TABS as readonly string[]).includes(first) ? (first as Tab) : "issue";
+  return { tab, symbol: decodeURIComponent(second).toUpperCase().slice(0, 10) };
 }
-window.addEventListener("hashchange", showTab);
+
+/** Old links (/app.html#convert?dollar=X) become clean ones (/mint/X). */
+function upgradeOldLink() {
+  if (!location.hash && TABS.some((t) => location.pathname.startsWith(`/${t}`))) return;
+  const [tab = "", query = ""] = location.hash.slice(1).split("?");
+  const q = new URLSearchParams(query);
+  const name = tab === "convert" ? "mint" : (TABS as readonly string[]).includes(tab) ? tab : "issue";
+  const sym = q.get("dollar") || q.get("symbol") || "";
+  history.replaceState(null, "", `/${name}${sym ? `/${encodeURIComponent(sym.toUpperCase())}` : ""}`);
+}
+
+function go(path: string) {
+  if (path !== location.pathname) history.pushState(null, "", path);
+  showTab();
+}
+
+function showTab() {
+  const { tab, symbol } = route();
+  const pane = tab === "mint" ? "convert" : tab;
+  document.querySelectorAll(".pane").forEach((p) => p.classList.toggle("on", p.id === `pane-${pane}`));
+  document.querySelectorAll("[data-tab]").forEach((a) => a.classList.toggle(a.closest(".tabs") ? "on" : "active", (a as HTMLElement).dataset.tab === tab));
+  document.title = `Tender · ${{ issue: "Issue", mint: "Mint & redeem", dollars: "Dollars", admin: "Admin" }[tab]}`;
+  if (symbol && tab === "issue" && !editing) {
+    $<HTMLInputElement>("#f-symbol").value = symbol;
+    $("#coin-sym").textContent = symbol;
+  }
+  if (symbol && tab === "mint" && issuers.some((i) => i.symbol === symbol)) {
+    $<HTMLSelectElement>("#c-issuer").value = symbol;
+    refreshBalances();
+  }
+}
+window.addEventListener("popstate", showTab);
+
+// Tab links switch in place instead of reloading the page.
+document.addEventListener("click", (e) => {
+  const a = (e.target as Element).closest?.("a");
+  if (!a || a.target || a.origin !== location.origin || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+  const first = a.pathname.split("/")[1];
+  if (!(TABS as readonly string[]).includes(first)) return;
+  e.preventDefault();
+  go(a.pathname);
+});
 
 // ---------------------------------------------------------------- wallet
 
@@ -152,7 +190,7 @@ async function refresh() {
     return;
   }
   if (!reserve) {
-    showNotice(`No Tender reserve found for program <code>${short(PROGRAM)}</code> on <code>${RPC}</code>. Deploy the program and run <code>scripts/init-reserve.ts</code> (see <a href="docs.html#quickstart">Quickstart</a>).`);
+    showNotice(`No Tender reserve found for program <code>${short(PROGRAM)}</code> on <code>${RPC}</code>. Deploy the program and run <code>scripts/init-reserve.ts</code> (see <a href="/docs/quickstart">Quickstart</a>).`);
     issuers = [];
   } else {
     $("#notice").classList.remove("show");
@@ -164,7 +202,7 @@ async function refresh() {
       // Keyless RPCs refuse getProgramAccounts. Show the dollars named in
       // the link or looked up before, and offer a search by symbol.
       canList = false;
-      const want = new URLSearchParams(location.hash.split("?")[1] || "").get("dollar");
+      const want = route().tab === "mint" ? route().symbol : "";
       if (want) remember(want);
       const found = await Promise.all(known().map((s) => t.fetchIssuer(s).catch(() => null)));
       issuers = found.filter((x): x is IssuerState => !!x);
@@ -277,7 +315,7 @@ $("#f-symbol").addEventListener("input", (e) => {
 
 function startEdit(i: IssuerState) {
   editing = i;
-  location.hash = "issue";
+  go("/issue");
   $("#issue-title").textContent = `Edit ${i.symbol} routes.`;
   $("#issue-sub").textContent = "Only the issuer's authority can change routes. Yield already earned goes out under the new routes at the next harvest.";
   $<HTMLInputElement>("#f-name").value = i.name;
@@ -328,7 +366,7 @@ $("#issue-form").addEventListener("submit", (e) => {
     if (routes.reduce((a, r) => a + r.bps, 0) !== 10_000) throw new Error("Route shares must add up to 100%");
     const sig = await signAndSend(conn, [t.createIssuer(me, { name, symbol, uri, routes })]);
     remember(symbol);
-    location.hash = `convert?dollar=${symbol}`;
+    go(`/mint/${symbol}`);
     return sig;
   });
 });
@@ -352,13 +390,17 @@ function selectedIssuer() {
 
 function renderIssuerSelect() {
   const sel = $<HTMLSelectElement>("#c-issuer");
-  const cur = sel.value || new URLSearchParams(location.hash.split("?")[1] || "").get("dollar") || "";
+  const cur = sel.value || (route().tab === "mint" ? route().symbol : "");
   sel.innerHTML = issuers.length
     ? issuers.map((i) => `<option value="${i.symbol}">${i.symbol} · ${escapeHtml(i.name)}</option>`).join("")
     : `<option value="">No dollars issued yet</option>`;
   if (issuers.some((i) => i.symbol === cur)) sel.value = cur;
 }
-$("#c-issuer").addEventListener("change", () => refreshBalances());
+$("#c-issuer").addEventListener("change", () => {
+  const sym = $<HTMLSelectElement>("#c-issuer").value;
+  if (sym) history.replaceState(null, "", `/mint/${sym}`);
+  refreshBalances();
+});
 
 async function tokenBal(acct: PublicKey) {
   try { return (await t.tokenBalances([acct]))[0]; } catch { return 0n; }
@@ -429,8 +471,8 @@ function renderDollars() {
   if (!reserve) { body.innerHTML = `<tr><td colspan="6" class="empty">No reserve on this cluster.</td></tr>`; return; }
   if (!issuers.length) {
     body.innerHTML = canList
-      ? `<tr><td colspan="6" class="empty">No dollars yet. <a href="#issue">Issue the first one.</a></td></tr>`
-      : `<tr><td colspan="6" class="empty">Find a dollar by its symbol above, or <a href="#issue">issue one</a>.</td></tr>`;
+      ? `<tr><td colspan="6" class="empty">No dollars yet. <a href="/issue">Issue the first one.</a></td></tr>`
+      : `<tr><td colspan="6" class="empty">Find a dollar by its symbol above, or <a href="/issue">issue one</a>.</td></tr>`;
     return;
   }
   const me = walletKey();
@@ -446,7 +488,7 @@ function renderDollars() {
       <td class="routes-mini">${routes}</td>
       <td style="white-space:nowrap">
         <button class="btn small yellow" data-harvest="${n}" ${ready > 0n ? "" : "disabled"}>Harvest</button>
-        <a class="btn small ghost" href="#convert?dollar=${i.symbol}">Mint</a>
+        <a class="btn small ghost" href="/mint/${i.symbol}">Mint</a>
         ${mine ? `<button class="btn small ghost" data-edit="${n}">Edit routes</button>` : ""}
       </td></tr>`;
   }).join("");
@@ -643,6 +685,7 @@ $("#settings-form").addEventListener("submit", (e) => {
 // ---------------------------------------------------------------- boot
 
 $("#devnet-help").hidden = CLUSTER !== "devnet";
+upgradeOldLink();
 showTab();
 routeTotal();
 connectWallet(true).catch(() => null).then(onWallet);
