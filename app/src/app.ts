@@ -4,7 +4,7 @@
 import "./polyfill";
 import "./styles.css";
 
-import { Connection, PublicKey } from "@solana/web3.js";
+import { Connection, PublicKey, TransactionInstruction } from "@solana/web3.js";
 import {
   DEFAULT_PROGRAM_ID, ROUTE_DOLLAR, ROUTE_USDC, Tender, formatUsd, friendlyError, harvestable, parseUsd,
   reserveValue, validSymbol, type IssuerState, type ReserveState, type Route,
@@ -539,6 +539,7 @@ async function renderAdmin() {
   };
   const any = roles.admin || roles.price || roles.allocator;
   $("#admin-tab").hidden = !any;
+  await renderClose();
   if (!any || !r) return;
   document.querySelectorAll<HTMLElement>("#pane-admin [data-role]").forEach((el) => {
     const role = el.dataset.role!;
@@ -681,6 +682,55 @@ $("#settings-form").addEventListener("submit", (e) => {
     return sig;
   });
 });
+
+// ---------------------------------------------------------------- close the program
+
+const LOADER = new PublicKey("BPFLoaderUpgradeab1e11111111111111111111111");
+const PROGRAM_DATA = PublicKey.findProgramAddressSync([PROGRAM.toBuffer()], LOADER)[0];
+
+/** The program's upgrade authority, or null if closed or immutable. */
+async function upgradeAuthority(): Promise<{ authority: PublicKey; lamports: number } | null> {
+  const acc = await conn.getAccountInfo(PROGRAM_DATA);
+  // ProgramData: u32 tag (3), u64 slot, Option<Pubkey> authority
+  if (!acc || acc.data.length < 45 || acc.data[0] !== 3 || acc.data[12] !== 1) return null;
+  return { authority: new PublicKey(acc.data.subarray(13, 45)), lamports: acc.lamports };
+}
+
+async function renderClose() {
+  const me = walletKey();
+  const card = $("#close-card");
+  const up = me ? await upgradeAuthority().catch(() => null) : null;
+  card.hidden = !(me && up && up.authority.equals(me));
+  if (card.hidden || !up) return;
+  $("#admin-tab").hidden = false;
+  $("#close-rent").textContent = (up.lamports / 1e9).toFixed(4);
+  $("#close-usdc").textContent = formatUsd(vaults.usdc);
+  $("#close-supply").textContent = formatUsd(reserve?.totalSupply ?? 0n);
+}
+
+$("#close-btn").addEventListener("click", () =>
+  run($<HTMLButtonElement>("#close-btn"), "Closing…", async () => {
+    const me = needWallet();
+    if ($<HTMLInputElement>("#close-confirm").value.trim() !== "CLOSE") throw new Error("Type CLOSE to confirm");
+    const up = await upgradeAuthority();
+    if (!up || !up.authority.equals(me)) throw new Error("Only the program's upgrade authority can close it");
+    if (vaults.usdc > 0n || vaults.tbill > 0n) throw new Error("The reserve still holds funds. Every dollar must be redeemed before closing.");
+    // BPF upgradeable loader `Close` (instruction 5): programdata, recipient, authority, program
+    const ix = new TransactionInstruction({
+      programId: LOADER,
+      keys: [
+        { pubkey: PROGRAM_DATA, isSigner: false, isWritable: true },
+        { pubkey: me, isSigner: false, isWritable: true },
+        { pubkey: me, isSigner: true, isWritable: false },
+        { pubkey: PROGRAM, isSigner: false, isWritable: true },
+      ],
+      data: Buffer.from([5, 0, 0, 0]),
+    });
+    const sig = await signAndSend(conn, [ix]);
+    $<HTMLInputElement>("#close-confirm").value = "";
+    return sig;
+  }),
+);
 
 // ---------------------------------------------------------------- boot
 

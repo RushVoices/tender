@@ -232,6 +232,19 @@
           <label style="display:flex;gap:10px;align-items:center;margin:4px 0 16px"><input type="checkbox" id="ad-paused" /> Pause new mints (redemptions keep working)</label>
           <button class="btn" type="submit" id="ad-save">Save settings</button>
         </form>
+
+        <!-- only shown to the program's upgrade authority -->
+        <div class="card" id="close-card" hidden style="border-color:var(--red)">
+          <div class="mono" style="color:var(--red)">upgrade authority · permanent</div>
+          <h2 class="h2">Close the program</h2>
+          <p class="muted" style="margin:0 0 14px;line-height:1.55">Shuts Tender down for good and sends the program’s rent (<b id="close-rent">–</b> SOL) back to your wallet. Every dollar stops working, this site stops working, and the program address can never be used again.</p>
+          <div class="rows">
+            <div class="row">USDC in the reserve <b id="close-usdc">–</b></div>
+            <div class="row">dollars outstanding <b id="close-supply">–</b></div>
+          </div>
+          <label class="field" style="margin-top:14px"><span>type CLOSE to confirm</span><input class="input" id="close-confirm" autocomplete="off" /></label>
+          <button class="btn" type="button" id="close-btn" style="background:var(--red);border-color:var(--red)">Close program and refund rent</button>
+        </div>
       </div>
     </section>
   </main>
