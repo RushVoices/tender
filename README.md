@@ -17,17 +17,17 @@
 
 | | Address |
 | --- | --- |
-| Program | `Tnd4ZV5367L8r7DDxLH97bA64SkR4Ke1Lf6GZa9VwgJ` |
-| Reserve | `9C4Tf22GakAo6STmU5JnrgFbTqJ5mgGKnWd2aEcqZyAa` |
-| USDC vault | `DuorJxY9acRPQbGuBw6LbbGqkHuEXnWWuSeHci47YmNX` |
-| USDY vault | `4AS2bXibt9bkn2o8YTcRyNWbNRpGAUVfgjUcBzKtJRuL` |
+| Program | `Tnd8T8boTCwrKGnbHu836C879kwuJknnbGv4JpVTVPU` |
+| Reserve | `d8qQtj4BZ5DDDnbcWM4G1JyPq4X9RdvejCnfMs6HMH8` |
+| USDC vault | `5meieY2fcjjhkV2dvdY4MuUNNF9BAXgLDK3GRDu1ijKi` |
+| USDY vault | `9yHdYHoiCCr58qHroC9LhCGHQrWFXioNqnFxDrkZWMwG` |
 | USDC | `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v` |
 | USDY (Ondo) | `A1KLoBrKBde8Ty9qtNQUtq3C2ortoC3u7twggz7sEto6` |
 | Admin, price authority, allocator, fee recipient, upgrade authority | `7D7K1r37He1GgzyR2UuSqqk5p8qbemd49hovhf5osg4g` |
 
 Settings at launch: 10% protocol fee on yield, 20% liquid USDC floor, $10,000 supply cap. Change them from the app's **Admin** tab with the admin wallet.
 
-The deployed binary is built with `--features no-idl,no-log-ix-name` (SHA-256 `a3756db2…99c4638`).
+The deployed binary is the lean native build in `programs/tender-native` (131 KB, SHA-256 `9e9134e9…77d8a0`). It is wire-compatible with the Anchor program in `programs/tender`; run the integration tests against it with `TENDER_SO=target/deploy/tender_native.so cargo test -p tender --test integration`.
 
 **Host the site on Vercel:** Add New → Project → this repo → Root Directory `tender/app` (or `app` if the project sits at the repo root) → Environment Variables: `VITE_RPC_URL` = your Helius mainnet URL → Deploy.
 
@@ -51,7 +51,7 @@ cargo build-sbf --manifest-path programs/tender/Cargo.toml
 cargo test -p tender --test integration        # 14 tests
 
 # client against the real program on a local validator
-solana-test-validator --reset --bpf-program Tnd4ZV5367L8r7DDxLH97bA64SkR4Ke1Lf6GZa9VwgJ target/deploy/tender.so
+solana-test-validator --reset --bpf-program Tnd8T8boTCwrKGnbHu836C879kwuJknnbGv4JpVTVPU target/deploy/tender.so
 cd app && npm install && npm run e2e
 ```
 

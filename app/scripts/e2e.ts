@@ -1,7 +1,7 @@
 // End-to-end check of the site's client (src/chain/tender.ts) against the
 // real compiled program on a local validator:
 //
-//   solana-test-validator --reset --bpf-program Tnd4ZV5367L8r7DDxLH97bA64SkR4Ke1Lf6GZa9VwgJ ../target/deploy/tender.so
+//   solana-test-validator --reset --bpf-program Tnd8T8boTCwrKGnbHu836C879kwuJknnbGv4JpVTVPU ../target/deploy/tender.so
 //   npm run e2e
 //
 // Creates USDC and Treasury test mints, sets up the reserve, issues a

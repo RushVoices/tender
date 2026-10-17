@@ -36,7 +36,7 @@ use anchor_spl::token_interface::{
     TokenMetadataInitialize, TransferChecked,
 };
 
-declare_id!("Tnd4ZV5367L8r7DDxLH97bA64SkR4Ke1Lf6GZa9VwgJ");
+declare_id!("Tnd8T8boTCwrKGnbHu836C879kwuJknnbGv4JpVTVPU");
 
 /// `tbill_price` is USDC base units per tbill base unit, times 1e9.
 pub const PRICE_SCALE: u128 = 1_000_000_000;

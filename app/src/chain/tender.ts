@@ -27,7 +27,7 @@ export const DECIMALS = 6;
 export const ROUTE_USDC = 0;
 export const ROUTE_DOLLAR = 1;
 
-export const DEFAULT_PROGRAM_ID = new PublicKey("Tnd4ZV5367L8r7DDxLH97bA64SkR4Ke1Lf6GZa9VwgJ");
+export const DEFAULT_PROGRAM_ID = new PublicKey("Tnd8T8boTCwrKGnbHu836C879kwuJknnbGv4JpVTVPU");
 
 // ---- encoding ----------------------------------------------------------------
 

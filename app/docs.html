@@ -137,7 +137,7 @@ RPC_URL=https://api.devnet.solana.com npx tsx scripts/init-reserve.ts
 cp .env.example .env &amp;&amp; npm run dev</code></pre>
         <p>To check the site’s client against the real program, start a local validator with the program loaded and run the end-to-end script:</p>
 <pre><code>solana-test-validator --reset \
-  --bpf-program Tnd4ZV5367L8r7DDxLH97bA64SkR4Ke1Lf6GZa9VwgJ ../target/deploy/tender.so
+  --bpf-program Tnd8T8boTCwrKGnbHu836C879kwuJknnbGv4JpVTVPU ../target/deploy/tender.so
 npm run e2e</code></pre>
       </section>
 
@@ -249,10 +249,10 @@ npm run e2e</code></pre>
         <h2>Accounts and addresses</h2>
         <table>
           <tr><th>account</th><th>seeds</th><th>mainnet address</th></tr>
-          <tr><td>program</td><td></td><td><code>Tnd4ZV5367L8r7DDxLH97bA64SkR4Ke1Lf6GZa9VwgJ</code></td></tr>
-          <tr><td>reserve</td><td><code>["reserve"]</code></td><td><code>9C4Tf22GakAo6STmU5JnrgFbTqJ5mgGKnWd2aEcqZyAa</code></td></tr>
-          <tr><td>USDC vault</td><td><code>["usdc_vault"]</code></td><td><code>DuorJxY9acRPQbGuBw6LbbGqkHuEXnWWuSeHci47YmNX</code></td></tr>
-          <tr><td>USDY vault</td><td><code>["tbill_vault"]</code></td><td><code>4AS2bXibt9bkn2o8YTcRyNWbNRpGAUVfgjUcBzKtJRuL</code></td></tr>
+          <tr><td>program</td><td></td><td><code>Tnd8T8boTCwrKGnbHu836C879kwuJknnbGv4JpVTVPU</code></td></tr>
+          <tr><td>reserve</td><td><code>["reserve"]</code></td><td><code>d8qQtj4BZ5DDDnbcWM4G1JyPq4X9RdvejCnfMs6HMH8</code></td></tr>
+          <tr><td>USDC vault</td><td><code>["usdc_vault"]</code></td><td><code>5meieY2fcjjhkV2dvdY4MuUNNF9BAXgLDK3GRDu1ijKi</code></td></tr>
+          <tr><td>USDY vault</td><td><code>["tbill_vault"]</code></td><td><code>9yHdYHoiCCr58qHroC9LhCGHQrWFXioNqnFxDrkZWMwG</code></td></tr>
           <tr><td>USDC mint</td><td></td><td><code>EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v</code></td></tr>
           <tr><td>USDY mint (Ondo)</td><td></td><td><code>A1KLoBrKBde8Ty9qtNQUtq3C2ortoC3u7twggz7sEto6</code></td></tr>
           <tr><td>issuer</td><td><code>["issuer", symbol]</code></td><td>one per dollar</td></tr>
@@ -323,7 +323,7 @@ const ready = harvestable(reserve, issuer, usdc, tbill);</code></pre>
 
       <section id="risks">
         <h2>Risks</h2>
-        <div class="callout"><strong>Unaudited.</strong> The program has 15 end-to-end tests, and the site’s client passes full runs on a local validator and on devnet. It has not been audited. The reserve has a supply cap so that no more than a set amount of USDC can be at risk while that’s true.</div>
+        <div class="callout"><strong>Unaudited.</strong> The program has 18 end-to-end tests, and the site’s client passes full runs on a local validator and on devnet. It has not been audited. The reserve has a supply cap so that no more than a set amount of USDC can be at risk while that’s true.</div>
         <ul>
           <li><strong>Treasury token risk.</strong> The reserve’s Treasury token is Ondo’s USDY. Ondo can freeze USDY accounts, and USDY isn’t offered to US persons. If USDY loses value or the vault is frozen, the reserve can be worth less than it owes. Yield stops first. Beyond that, the last redeemers bear the loss.</li>
           <li><strong>Price authority.</strong> The USDY price comes from a trusted signer, bounded to 0.5% an hour; the Admin tab suggests USDY’s market price from Jupiter. An overstated price counts yield that isn’t there.</li>

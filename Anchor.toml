@@ -6,10 +6,10 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-tender = "Tnd4ZV5367L8r7DDxLH97bA64SkR4Ke1Lf6GZa9VwgJ"
+tender = "Tnd8T8boTCwrKGnbHu836C879kwuJknnbGv4JpVTVPU"
 
 [programs.devnet]
-tender = "Tnd4ZV5367L8r7DDxLH97bA64SkR4Ke1Lf6GZa9VwgJ"
+tender = "Tnd8T8boTCwrKGnbHu836C879kwuJknnbGv4JpVTVPU"
 
 [provider]
 cluster = "devnet"

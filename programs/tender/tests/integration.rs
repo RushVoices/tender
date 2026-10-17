@@ -305,7 +305,9 @@ impl Env {
 
 fn setup() -> Env {
     let mut svm = LiteSVM::new();
-    let so = concat!(env!("CARGO_MANIFEST_DIR"), "/../../target/deploy/tender.so");
+    // TENDER_SO=…/tender_native.so runs these same tests against the lean build.
+    let so = std::env::var("TENDER_SO")
+        .unwrap_or_else(|_| concat!(env!("CARGO_MANIFEST_DIR"), "/../../target/deploy/tender.so").to_string());
     svm.add_program_from_file(tender::ID, so).expect("build first: cargo build-sbf");
     let admin = Keypair::new();
     svm.airdrop(&admin.pubkey(), 100_000_000_000).unwrap();
@@ -817,4 +819,178 @@ fn supply_cap_limits_mints_but_not_redemptions_or_yield() {
     env.update_reserve(p).unwrap();
     mint(&mut env, &alice, "CAPUSD", 9 * USD).unwrap();
     env.assert_solvent();
+}
+
+// ---------------------------------------------------------------- account-safety checks
+// Anchor enforced these automatically; the lean build does them by hand, so
+// each one gets a test that tries to cheat it.
+
+#[test]
+fn rejects_tampered_accounts() {
+    let mut env = setup();
+    let payee = env.wallet().pubkey();
+    simple_issuer(&mut env, "SAFE", &payee);
+    let alice = user(&mut env, "SAFE", 1_000 * USD);
+    mint(&mut env, &alice, "SAFE", 1_000 * USD).unwrap();
+    let mallory = user(&mut env, "SAFE", 1_000 * USD);
+
+    let base = env.convert_ix(&mallory.kp.pubkey(), "SAFE", &mallory.usdc, &mallory.dollar, 100 * USD, false);
+    let with = |env: &mut Env, idx: usize, meta: AccountMeta| {
+        let mut ix = base.clone();
+        ix.accounts[idx] = meta;
+        let m = mallory.kp.insecure_clone();
+        env.send(&[ix], &[&m])
+    };
+
+    // 1. redeem paying out to alice's USDC account instead of mallory's own
+    assert!(with(&mut env, 7, AccountMeta::new(alice.usdc, false)).is_err());
+    // 2. burn from alice's dollar account
+    assert!(with(&mut env, 8, AccountMeta::new(alice.dollar, false)).is_err());
+    // 3. a fake reserve: a copy of the real one at another address
+    let fake = Pubkey::new_unique();
+    let mut acct = env.svm.get_account(&reserve_pda()).unwrap();
+    env.svm.set_account(fake, acct.clone()).unwrap();
+    assert!(with(&mut env, 1, AccountMeta::new(fake, false)).is_err());
+    // 4. the same bytes owned by another program at the real address is impossible,
+    //    but a reserve-shaped account owned by someone else must be refused
+    acct.owner = Pubkey::new_unique();
+    let fake2 = Pubkey::new_unique();
+    env.svm.set_account(fake2, acct).unwrap();
+    assert!(with(&mut env, 1, AccountMeta::new(fake2, false)).is_err());
+    // 5. mallory's own USDC account posing as the reserve's vault
+    assert!(with(&mut env, 5, AccountMeta::new(mallory.usdc, false)).is_err());
+    // 6. a made-up token program
+    assert!(with(&mut env, 9, AccountMeta::new_readonly(Pubkey::new_unique(), false)).is_err());
+    // 7. classic SPL Token where Token-2022 is required
+    assert!(with(&mut env, 10, AccountMeta::new_readonly(spl_token::ID, false)).is_err());
+
+    // 8. the user must sign: redeem alice's dollars without her signature
+    let mut ix = env.convert_ix(&alice.kp.pubkey(), "SAFE", &alice.usdc, &alice.dollar, 100 * USD, false);
+    ix.accounts[0].is_signer = false;
+    let m = mallory.kp.insecure_clone();
+    assert!(env.send(&[ix], &[&m]).is_err());
+
+    // nothing moved
+    assert_eq!(env.balance(&alice.dollar), 1_000 * USD);
+    assert_eq!(env.balance(&alice.usdc), 0);
+    assert_eq!(env.balance(&usdc_vault()), 1_000 * USD);
+    env.assert_solvent();
+}
+
+#[test]
+fn only_the_roles_can_run_the_reserve() {
+    let mut env = setup();
+    let payee = env.wallet().pubkey();
+    simple_issuer(&mut env, "ROLE", &payee);
+    let alice = user(&mut env, "ROLE", 1_000 * USD);
+    mint(&mut env, &alice, "ROLE", 1_000 * USD).unwrap();
+    let mallory = env.wallet();
+
+    // update_reserve signed by a stranger
+    let mut params = env.params();
+    params.treasury = mallory.pubkey();
+    let ix = Instruction {
+        program_id: tender::ID,
+        accounts: tender::accounts::AdminOnly {
+            admin: mallory.pubkey(),
+            reserve: reserve_pda(),
+            usdc_vault: usdc_vault(),
+            tbill_vault: tbill_vault(),
+        }
+        .to_account_metas(None),
+        data: tender::instruction::UpdateReserve { params }.data(),
+    };
+    assert!(env.send(&[ix], &[&mallory]).is_err());
+
+    // set_admin signed by a stranger
+    let ix = Instruction {
+        program_id: tender::ID,
+        accounts: tender::accounts::AdminOnlyLight { admin: mallory.pubkey(), reserve: reserve_pda() }.to_account_metas(None),
+        data: tender::instruction::SetAdmin { new_admin: mallory.pubkey() }.data(),
+    };
+    assert!(env.send(&[ix], &[&mallory]).is_err());
+
+    // invest signed by a stranger with their own token accounts
+    let (usdc, tbill) = (env.usdc, env.tbill);
+    let m_usdc = env.token_account(&usdc, &mallory.pubkey(), &spl_token::ID);
+    let m_tbill = env.token_account(&tbill, &mallory.pubkey(), &spl_token::ID);
+    env.fund(&tbill, &m_tbill, 500 * USD);
+    let ix = Instruction {
+        program_id: tender::ID,
+        accounts: tender::accounts::Rebalance {
+            allocator: mallory.pubkey(),
+            reserve: reserve_pda(),
+            usdc_mint: usdc,
+            tbill_mint: tbill,
+            usdc_vault: usdc_vault(),
+            tbill_vault: tbill_vault(),
+            allocator_usdc: m_usdc,
+            allocator_tbill: m_tbill,
+            usdc_token_program: spl_token::ID,
+            tbill_token_program: spl_token::ID,
+        }
+        .to_account_metas(None),
+        data: tender::instruction::Invest { tbill_amount: 500 * USD }.data(),
+    };
+    assert!(env.send(&[ix], &[&mallory]).is_err());
+
+    // protocol fee can't be sent to a stranger's account
+    env.fund(&usdc, &usdc_vault(), 10 * USD);
+    assert!(env.collect_fee(&m_usdc).is_err());
+
+    let r = env.reserve();
+    assert_eq!(r.admin, env.admin.pubkey());
+    assert_eq!(r.treasury, env.treasury.pubkey());
+    assert_eq!(env.balance(&m_usdc), 0);
+    env.assert_solvent();
+}
+
+#[test]
+fn issuer_and_reserve_cannot_be_created_twice_or_at_wrong_addresses() {
+    let mut env = setup();
+    // a second initialize_reserve fails: the account exists
+    let ix = Instruction {
+        program_id: tender::ID,
+        accounts: tender::accounts::InitializeReserve {
+            admin: env.admin.pubkey(),
+            reserve: reserve_pda(),
+            usdc_mint: env.usdc,
+            tbill_mint: env.tbill,
+            usdc_vault: usdc_vault(),
+            tbill_vault: tbill_vault(),
+            usdc_token_program: spl_token::ID,
+            tbill_token_program: spl_token::ID,
+            system_program: system_program::ID,
+        }
+        .to_account_metas(None),
+        data: tender::instruction::InitializeReserve { params: env.params() }.data(),
+    };
+    let admin = env.admin.insecure_clone();
+    assert!(env.send(&[ix], &[&admin]).is_err());
+
+    // create_issuer with an issuer address that doesn't match the symbol
+    let creator = env.wallet();
+    let wrong = issuer_pda("OTHER");
+    let ix = Instruction {
+        program_id: tender::ID,
+        accounts: tender::accounts::CreateIssuer {
+            creator: creator.pubkey(),
+            reserve: reserve_pda(),
+            issuer: wrong,
+            mint: mint_pda(&wrong),
+            dollar_token_program: spl_token_2022::ID,
+            system_program: system_program::ID,
+        }
+        .to_account_metas(None),
+        data: tender::instruction::CreateIssuer {
+            args: tender::CreateIssuerArgs {
+                name: "x".into(),
+                symbol: "REAL".into(),
+                uri: String::new(),
+                routes: vec![usdc_route(&creator.pubkey(), 10_000)],
+            },
+        }
+        .data(),
+    };
+    assert!(env.send(&[ix], &[&creator]).is_err());
 }
