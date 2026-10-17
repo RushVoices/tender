@@ -176,7 +176,11 @@
     </section>
     <!-- admin: only shown to the reserve's admin, price authority or allocator -->
     <section class="pane" id="pane-admin">
-      <div class="admin-grid">
+      <div class="card" id="admin-note" style="max-width:560px">
+        <h2 class="h2">Admin only</h2>
+        <p class="muted" style="margin:0;line-height:1.55">This page is for the wallets that run the reserve. Connect the admin wallet to see it, or head back to <a href="/issue">issue</a> or <a href="/mint">mint</a> a dollar.</p>
+      </div>
+      <div class="admin-grid" id="admin-grid" hidden>
         <form class="card" id="price-form" data-role="price">
           <div class="mono muted">price authority</div>
           <h2 class="h2">Treasury price</h2>

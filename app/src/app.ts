@@ -539,7 +539,12 @@ async function renderAdmin() {
   };
   const any = roles.admin || roles.price || roles.allocator;
   $("#admin-tab").hidden = !any;
-  await renderClose();
+  const closer = await renderClose();
+  // Strangers who type /admin see a short note, never the forms. (The program
+  // rejects their transactions anyway; this just keeps the page tidy.)
+  $("#admin-grid").hidden = !(any || closer);
+  $("#admin-note").hidden = any || closer;
+  if (!any) document.querySelectorAll<HTMLElement>("#pane-admin [data-role]").forEach((el) => (el.hidden = true));
   if (!any || !r) return;
   document.querySelectorAll<HTMLElement>("#pane-admin [data-role]").forEach((el) => {
     const role = el.dataset.role!;
@@ -696,16 +701,17 @@ async function upgradeAuthority(): Promise<{ authority: PublicKey; lamports: num
   return { authority: new PublicKey(acc.data.subarray(13, 45)), lamports: acc.lamports };
 }
 
-async function renderClose() {
+async function renderClose(): Promise<boolean> {
   const me = walletKey();
   const card = $("#close-card");
   const up = me ? await upgradeAuthority().catch(() => null) : null;
   card.hidden = !(me && up && up.authority.equals(me));
-  if (card.hidden || !up) return;
+  if (card.hidden || !up) return false;
   $("#admin-tab").hidden = false;
   $("#close-rent").textContent = (up.lamports / 1e9).toFixed(4);
   $("#close-usdc").textContent = formatUsd(vaults.usdc);
   $("#close-supply").textContent = formatUsd(reserve?.totalSupply ?? 0n);
+  return true;
 }
 
 $("#close-btn").addEventListener("click", () =>
